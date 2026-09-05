@@ -1,0 +1,718 @@
+﻿export type Language = "en" | "ko" | "ja" | "zh";
+
+export interface LanguageOption {
+  code: Language;
+  label: string;
+  nativeName: string;
+}
+
+export const SUPPORTED_LANGUAGES: LanguageOption[] = [
+  { code: "en", label: "English", nativeName: "English" },
+  { code: "ko", label: "Korean", nativeName: "한국어" },
+  { code: "ja", label: "Japanese", nativeName: "日本語" },
+  { code: "zh", label: "Simplified Chinese", nativeName: "简体中文" },
+];
+
+export const translations = {
+  en: {
+    // App Header & Navigation
+    "app.title": "AI Switcher",
+    "app.subtitle": "Windows Multi-Account & Workspace Manager",
+    "app.addAccount": "Add Account",
+    "app.workspaces": "Workspaces",
+    "app.browsers": "Browser Profiles",
+    "app.settings": "Settings",
+    "app.diagnostics": "Diagnostics",
+    "app.refresh": "Refresh",
+    "app.showDisabled": "Show Disabled Accounts",
+    "app.hideDisabled": "Hide Disabled Accounts",
+    "app.favorites": "Favorites",
+    "app.recents": "Recent Activity",
+    "app.noFavorites": "No favorite accounts pinned yet.",
+    "app.footer.status": "Ready",
+    "app.footer.trayActive": "System Tray Active",
+    "app.footer.diagnostics": "Health & Diagnostics",
+
+    // Common Buttons & Actions
+    "action.save": "Save",
+    "action.cancel": "Cancel",
+    "action.close": "Close",
+    "action.delete": "Delete",
+    "action.edit": "Edit",
+    "action.rename": "Rename",
+    "action.create": "Create",
+    "action.browse": "Browse...",
+    "action.launch": "Launch",
+    "action.login": "Log In",
+    "action.logout": "Log Out",
+    "action.repair": "Repair",
+    "action.reset": "Reset",
+    "action.apply": "Apply",
+    "action.saving": "Saving...",
+    "action.loading": "Loading...",
+    "action.confirm": "Confirm",
+    "action.back": "Back",
+    "action.next": "Next",
+    "action.finish": "Finish & Complete",
+    "action.remove": "Remove",
+    "action.add": "Add",
+
+    // Status Badges
+    "status.ready": "Ready",
+    "status.running": "Running",
+    "status.loginRequired": "Login Required",
+    "status.error": "Error",
+    "status.unknown": "Unknown",
+    "status.disabled": "Disabled",
+
+    // Platform Sections & Account Cards
+    "platform.codex": "OpenAI Codex",
+    "platform.claude": "Anthropic Claude",
+    "platform.antigravity": "Google Antigravity",
+    "platform.noAccounts": "No accounts registered for this platform.",
+    "platform.addFirstAccount": "Register Account",
+    "account.identifier": "Identifier",
+    "account.profilePath": "Profile Path",
+    "account.defaultWorkspace": "Default Workspace",
+    "account.noneSet": "None configured",
+    "account.launchDesktop": "Launch Desktop",
+    "account.launchCli": "Launch CLI Terminal",
+    "account.launchWeb": "Launch Web",
+    "account.favorite": "Pin to Favorites",
+    "account.unfavorite": "Unpin from Favorites",
+    "account.enable": "Enable Profile",
+    "account.disable": "Disable Profile",
+
+    // Settings Modal
+    "settings.title": "Settings",
+    "settings.tabs.general": "General",
+    "settings.tabs.appearance": "Appearance",
+    "settings.tabs.language": "Language",
+    "settings.tabs.shortcuts": "Shortcuts",
+    "settings.tabs.diagnostics": "Diagnostics",
+
+    // Settings - General
+    "settings.autostart.title": "Start with Windows",
+    "settings.autostart.desc": "Launch AI Switcher in the background when your computer boots.",
+    "settings.startMinimized.title": "Start Minimized to System Tray",
+    "settings.startMinimized.desc": "When launching automatically or manually, keep window hidden in tray.",
+    "settings.closeToTray.title": "Minimize to Tray on Close (X)",
+    "settings.closeToTray.desc": "Clicking the window close button hides AI Switcher to the tray rather than quitting.",
+    "settings.firstCloseNotice.title": "First-Close Tray Notice",
+    "settings.firstCloseNotice.desc": "Show confirmation dialog explaining tray operation on window close.",
+    "settings.firstCloseNotice.resetBtn": "Reset Notice",
+
+    // Settings - Appearance
+    "settings.appearance.themeTitle": "Color Theme",
+    "settings.theme.system": "System Default",
+    "settings.theme.systemDesc": "Matches Windows dark/light mode automatically",
+    "settings.theme.light": "Light Theme",
+    "settings.theme.lightDesc": "Clean, crisp high-contrast daylight styling",
+    "settings.theme.dark": "Dark Theme",
+    "settings.theme.darkDesc": "Modern sleek dark background with clear accents",
+
+    // Settings - Language
+    "settings.language.title": "Display Language",
+    "settings.language.desc": "Choose your preferred language for the AI Switcher user interface.",
+
+    // Settings - Shortcuts
+    "settings.shortcuts.title": "Global Window Toggle Hotkey",
+    "settings.shortcuts.desc": "Press this hotkey anywhere in Windows to instantly summon or hide AI Switcher.",
+    "settings.shortcuts.placeholder": "e.g. CommandOrControl+Alt+S",
+    "settings.shortcuts.applyBtn": "Apply Hotkey",
+    "settings.shortcuts.modifiersTitle": "Supported Modifiers:",
+    "settings.shortcuts.ctrl": "CommandOrControl (Ctrl on Windows)",
+    "settings.shortcuts.alt": "Alt",
+    "settings.shortcuts.shift": "Shift",
+    "settings.shortcuts.example": "Example: CommandOrControl+Alt+S or CommandOrControl+Shift+Space",
+
+    // Settings - Diagnostics
+    "settings.diag.appVersion": "App Version",
+    "settings.diag.activeProcesses": "Active Processes",
+    "settings.diag.storageLocations": "Storage Locations",
+    "settings.diag.baseDataDir": "Base Data Directory:",
+    "settings.diag.capabilities": "Platform Capabilities Status",
+
+    // Wizard
+    "wizard.title": "Register Account Profile",
+    "wizard.step1": "1. Platform",
+    "wizard.step2": "2. Environment",
+    "wizard.step3": "3. Identity",
+    "wizard.step4": "4. Workspace",
+    "wizard.step5": "5. Confirmation",
+    "wizard.codexNotice": "Notice: OpenAI Codex Desktop currently operates under a shared single-instance architecture on Windows. Multi-instance CLI isolation is fully supported via separate profile paths.",
+    "wizard.antigravityNotice": "Google Antigravity Desktop profiles are fully isolated using independent storage and verified CWD workspace execution.",
+    "wizard.claudeNotice": "Anthropic Claude Desktop profiles operate with dedicated isolated user data directories.",
+    "wizard.displayName": "Display Name",
+    "wizard.displayNamePlaceholder": "e.g. Work Account, Personal, Project X",
+    "wizard.emailOrId": "Account Identifier / Email (Optional)",
+    "wizard.emailPlaceholder": "e.g. dev@company.com",
+    "wizard.defaultWorkspace": "Default Workspace Directory",
+    "wizard.defaultWorkspacePlaceholder": "Select or enter a folder path (e.g. H:\\dev\\project)",
+    "wizard.browserProfile": "Browser Profile for Web & Authentication",
+    "wizard.securityAssurance": "Data Security & Isolation Guarantee: All account credentials and environment configurations are stored locally in isolated Windows directories. AI Switcher never intercepts or transmits your authentication tokens or API keys.",
+
+    // Workspace Presets Modal
+    "workspace.modalTitle": "Workspace Presets",
+    "workspace.addPreset": "New Workspace Preset",
+    "workspace.name": "Workspace Name",
+    "workspace.path": "Directory Path",
+    "workspace.preferredAccounts": "Preferred Account Mappings",
+    "workspace.noPresets": "No workspace presets defined yet.",
+    "workspace.launchWith": "Launch with {platform}",
+
+    // Browser Profiles Modal
+    "browser.modalTitle": "Browser Profiles",
+    "browser.addProfile": "New Browser Profile",
+    "browser.name": "Profile Display Name",
+    "browser.kind": "Browser Engine",
+    "browser.dataDir": "User Data Directory",
+    "browser.detectedBrowsers": "Detected Installed Browsers",
+
+    // Diagnostics & Repair Center
+    "diagCenter.title": "Diagnostics & Health Center",
+    "diagCenter.dbStatus": "Database Integrity",
+    "diagCenter.backupCount": "Available Backups",
+    "diagCenter.repairAll": "Run Automatic Repairs",
+    "diagCenter.exportBundle": "Export Support Bundle",
+    "diagCenter.cleanBundleNotice": "Support bundles contain zero credentials or tokens and are fully sanitized.",
+
+    // Conflict Dialog
+    "conflict.title": "Active Process Detected",
+    "conflict.desc": "Another instance or session for this platform is currently running. Would you like to proceed or switch focus?",
+    "conflict.force": "Launch Anyway",
+
+    // First Close Dialog
+    "firstClose.title": "AI Switcher Running in Tray",
+    "firstClose.desc": "Closing the window leaves AI Switcher running quietly in your Windows system tray. You can summon it at any time via the tray icon or global hotkey.",
+    "firstClose.dontShowAgain": "Do not show this message again",
+    "firstClose.gotIt": "Understood",
+  },
+
+  ko: {
+    // App Header & Navigation
+    "app.title": "AI Switcher",
+    "app.subtitle": "Windows 멀티 계정 & 작업 영역 관리자",
+    "app.addAccount": "계정 추가",
+    "app.workspaces": "작업 영역 (Workspaces)",
+    "app.browsers": "브라우저 프로필",
+    "app.settings": "설정",
+    "app.diagnostics": "진단 및 복구",
+    "app.refresh": "새로고침",
+    "app.showDisabled": "비활성화된 계정 표시",
+    "app.hideDisabled": "비활성화된 계정 숨기기",
+    "app.favorites": "즐겨찾기",
+    "app.recents": "최근 사용",
+    "app.noFavorites": "즐겨찾기에 등록된 계정이 없습니다.",
+    "app.footer.status": "준비됨",
+    "app.footer.trayActive": "시스템 트레이 상주 중",
+    "app.footer.diagnostics": "상태 점검 & 복구 센터",
+
+    // Common Buttons & Actions
+    "action.save": "저장",
+    "action.cancel": "취소",
+    "action.close": "닫기",
+    "action.delete": "삭제",
+    "action.edit": "편집",
+    "action.rename": "이름 변경",
+    "action.create": "생성",
+    "action.browse": "찾아보기...",
+    "action.launch": "실행",
+    "action.login": "로그인",
+    "action.logout": "로그아웃",
+    "action.repair": "복구",
+    "action.reset": "초기화",
+    "action.apply": "적용",
+    "action.saving": "저장 중...",
+    "action.loading": "불러오는 중...",
+    "action.confirm": "확인",
+    "action.back": "이전",
+    "action.next": "다음",
+    "action.finish": "완료 및 등록",
+    "action.remove": "제거",
+    "action.add": "추가",
+
+    // Status Badges
+    "status.ready": "준비 완료",
+    "status.running": "실행 중",
+    "status.loginRequired": "로그인 필요",
+    "status.error": "오류",
+    "status.unknown": "확인 필요",
+    "status.disabled": "비활성화됨",
+
+    // Platform Sections & Account Cards
+    "platform.codex": "OpenAI Codex",
+    "platform.claude": "Anthropic Claude",
+    "platform.antigravity": "Google Antigravity",
+    "platform.noAccounts": "이 플랫폼에 등록된 계정이 없습니다.",
+    "platform.addFirstAccount": "새 계정 등록",
+    "account.identifier": "계정 식별자",
+    "account.profilePath": "프로필 경로",
+    "account.defaultWorkspace": "기본 작업 폴더",
+    "account.noneSet": "미설정",
+    "account.launchDesktop": "데스크톱 앱 실행",
+    "account.launchCli": "CLI 터미널 실행",
+    "account.launchWeb": "웹 환경 실행",
+    "account.favorite": "즐겨찾기 고정",
+    "account.unfavorite": "즐겨찾기 해제",
+    "account.enable": "프로필 활성화",
+    "account.disable": "프로필 비활성화",
+
+    // Settings Modal
+    "settings.title": "설정",
+    "settings.tabs.general": "일반",
+    "settings.tabs.appearance": "테마 및 화면",
+    "settings.tabs.language": "언어 설정",
+    "settings.tabs.shortcuts": "단축키",
+    "settings.tabs.diagnostics": "진단 정보",
+
+    // Settings - General
+    "settings.autostart.title": "Windows 시작 시 자동 실행",
+    "settings.autostart.desc": "컴퓨터 부팅 시 AI Switcher가 백그라운드에서 자동으로 시작됩니다.",
+    "settings.startMinimized.title": "시작 시 시스템 트레이로 최소화",
+    "settings.startMinimized.desc": "앱이 실행될 때 창을 띄우지 않고 시스템 트레이에 조용히 머뭅니다.",
+    "settings.closeToTray.title": "창 닫기(X) 시 트레이로 최소화",
+    "settings.closeToTray.desc": "닫기 버튼을 누를 때 앱을 완전히 종료하지 않고 시스템 트레이로 숨깁니다.",
+    "settings.firstCloseNotice.title": "트레이 최소화 안내 알림",
+    "settings.firstCloseNotice.desc": "창을 닫을 때 트레이 동작에 대해 안내하는 대화상자를 다시 표시합니다.",
+    "settings.firstCloseNotice.resetBtn": "안내 다시 켜기",
+
+    // Settings - Appearance
+    "settings.appearance.themeTitle": "화면 테마",
+    "settings.theme.system": "시스템 기본값",
+    "settings.theme.systemDesc": "Windows 다크/라이트 모드 설정에 자동으로 맞춥니다",
+    "settings.theme.light": "라이트 모드",
+    "settings.theme.lightDesc": "밝고 선명한 고대비 주간 스타일",
+    "settings.theme.dark": "다크 모드",
+    "settings.theme.darkDesc": "눈의 피로를 줄여주는 세련된 다크 스타일",
+
+    // Settings - Language
+    "settings.language.title": "인터페이스 언어",
+    "settings.language.desc": "AI Switcher에서 사용할 기본 언어를 선택하세요.",
+
+    // Settings - Shortcuts
+    "settings.shortcuts.title": "전역 창 열기/숨기기 단축키",
+    "settings.shortcuts.desc": "Windows 어디서나 이 단축키를 눌러 AI Switcher 창을 즉시 표시하거나 숨길 수 있습니다.",
+    "settings.shortcuts.placeholder": "예: CommandOrControl+Alt+S",
+    "settings.shortcuts.applyBtn": "단축키 적용",
+    "settings.shortcuts.modifiersTitle": "지원되는 조합 키:",
+    "settings.shortcuts.ctrl": "CommandOrControl (Windows에서는 Ctrl)",
+    "settings.shortcuts.alt": "Alt",
+    "settings.shortcuts.shift": "Shift",
+    "settings.shortcuts.example": "예: CommandOrControl+Alt+S 또는 CommandOrControl+Shift+Space",
+
+    // Settings - Diagnostics
+    "settings.diag.appVersion": "앱 버전",
+    "settings.diag.activeProcesses": "실행 중인 프로세스",
+    "settings.diag.storageLocations": "저장 경로",
+    "settings.diag.baseDataDir": "기본 데이터 저장 폴더:",
+    "settings.diag.capabilities": "플랫폼별 격리 및 실행 기능 상태",
+
+    // Wizard
+    "wizard.title": "계정 프로필 등록",
+    "wizard.step1": "1. 플랫폼 선택",
+    "wizard.step2": "2. 실행 환경",
+    "wizard.step3": "3. 계정 정보",
+    "wizard.step4": "4. 작업 영역",
+    "wizard.step5": "5. 등록 완료",
+    "wizard.codexNotice": "안내: OpenAI Codex 데스크톱 앱은 현재 Windows에서 단일 인스턴스 세션 구조로 작동합니다. 독립 프로필 격리는 전용 CLI 터미널 환경에서 완벽하게 지원됩니다.",
+    "wizard.antigravityNotice": "Google Antigravity 데스크톱 프로필은 전용 저장소와 독립 CWD 작업 영역을 통해 완전히 격리되어 실행됩니다.",
+    "wizard.claudeNotice": "Anthropic Claude 데스크톱 프로필은 각각 분리된 전용 사용자 데이터 디렉터리로 실행됩니다.",
+    "wizard.displayName": "계정 표시 이름",
+    "wizard.displayNamePlaceholder": "예: 업무용 계정, 개인 프로젝트, 계정 2",
+    "wizard.emailOrId": "계정 이메일 또는 식별자 (선택)",
+    "wizard.emailPlaceholder": "예: dev@company.com",
+    "wizard.defaultWorkspace": "기본 작업 폴더 (Workspace)",
+    "wizard.defaultWorkspacePlaceholder": "폴더를 선택하거나 경로를 입력하세요 (예: H:\\dev\\project)",
+    "wizard.browserProfile": "웹 및 인증용 브라우저 프로필",
+    "wizard.securityAssurance": "데이터 보안 및 독립성 보장: 모든 인증 정보와 환경 설정은 로컬 Windows 디렉터리에 독립적으로 안전하게 격리 보관됩니다. AI Switcher는 사용자의 로그인 토큰이나 비밀번호를 외부로 전송하거나 가로채지 않습니다.",
+
+    // Workspace Presets Modal
+    "workspace.modalTitle": "작업 영역 (Workspace) 프리셋",
+    "workspace.addPreset": "새 작업 영역 등록",
+    "workspace.name": "작업 영역 이름",
+    "workspace.path": "작업 폴더 경로",
+    "workspace.preferredAccounts": "연결할 기본 계정 설정",
+    "workspace.noPresets": "등록된 작업 영역 프리셋이 없습니다.",
+    "workspace.launchWith": "{platform}(으)로 열기",
+
+    // Browser Profiles Modal
+    "browser.modalTitle": "브라우저 프로필 관리",
+    "browser.addProfile": "새 브라우저 프로필 생성",
+    "browser.name": "프로필 표시 이름",
+    "browser.kind": "브라우저 종류",
+    "browser.dataDir": "사용자 데이터 디렉터리",
+    "browser.detectedBrowsers": "감지된 시스템 설치 브라우저",
+
+    // Diagnostics & Repair Center
+    "diagCenter.title": "진단 및 무결성 점검 센터",
+    "diagCenter.dbStatus": "데이터베이스 무결성",
+    "diagCenter.backupCount": "보관된 백업 수",
+    "diagCenter.repairAll": "전체 프로필 자동 점검 및 복구",
+    "diagCenter.exportBundle": "지원 번들 내보내기",
+    "diagCenter.cleanBundleNotice": "지원 번들에는 비밀번호나 토큰 정보가 일절 포함되지 않으며 완벽하게 익명화 처리됩니다.",
+
+    // Conflict Dialog
+    "conflict.title": "실행 중인 프로세스 감지",
+    "conflict.desc": "해당 플랫폼의 다른 인스턴스 또는 세션이 이미 실행 중입니다. 새로 실행하시겠습니까?",
+    "conflict.force": "강제 실행",
+
+    // First Close Dialog
+    "firstClose.title": "AI Switcher 시스템 트레이 안내",
+    "firstClose.desc": "창을 닫아도 AI Switcher는 Windows 작업 표시줄 트레이에서 계속 실행됩니다. 트레이 아이콘이나 단축키로 언제든지 바로 불러올 수 있습니다.",
+    "firstClose.dontShowAgain": "이 안내를 다시 보지 않기",
+    "firstClose.gotIt": "확인했습니다",
+  },
+
+  ja: {
+    // App Header & Navigation
+    "app.title": "AI Switcher",
+    "app.subtitle": "Windows マルチアカウント＆ワークスペース管理",
+    "app.addAccount": "アカウント追加",
+    "app.workspaces": "ワークスペース",
+    "app.browsers": "ブラウザプロファイル",
+    "app.settings": "設定",
+    "app.diagnostics": "診断と修復",
+    "app.refresh": "更新",
+    "app.showDisabled": "無効なアカウントを表示",
+    "app.hideDisabled": "無効なアカウントを非表示",
+    "app.favorites": "お気に入り",
+    "app.recents": "最近のアクティビティ",
+    "app.noFavorites": "お気に入りに追加されたアカウントはありません。",
+    "app.footer.status": "準備完了",
+    "app.footer.trayActive": "システムトレイ常駐中",
+    "app.footer.diagnostics": "ヘルスチェック＆診断センター",
+
+    // Common Buttons & Actions
+    "action.save": "保存",
+    "action.cancel": "キャンセル",
+    "action.close": "閉じる",
+    "action.delete": "削除",
+    "action.edit": "編集",
+    "action.rename": "名前変更",
+    "action.create": "作成",
+    "action.browse": "参照...",
+    "action.launch": "起動",
+    "action.login": "ログイン",
+    "action.logout": "ログアウト",
+    "action.repair": "修復",
+    "action.reset": "リセット",
+    "action.apply": "適用",
+    "action.saving": "保存中...",
+    "action.loading": "読み込み中...",
+    "action.confirm": "確認",
+    "action.back": "戻る",
+    "action.next": "次へ",
+    "action.finish": "完了して登録",
+    "action.remove": "削除",
+    "action.add": "追加",
+
+    // Status Badges
+    "status.ready": "準備完了",
+    "status.running": "実行中",
+    "status.loginRequired": "ログインが必要",
+    "status.error": "エラー",
+    "status.unknown": "未確認",
+    "status.disabled": "無効",
+
+    // Platform Sections & Account Cards
+    "platform.codex": "OpenAI Codex",
+    "platform.claude": "Anthropic Claude",
+    "platform.antigravity": "Google Antigravity",
+    "platform.noAccounts": "このプラットフォームに登録されたアカウントはありません。",
+    "platform.addFirstAccount": "アカウントを登録",
+    "account.identifier": "アカウント識別子",
+    "account.profilePath": "プロファイルパス",
+    "account.defaultWorkspace": "既定のワークスペース",
+    "account.noneSet": "未設定",
+    "account.launchDesktop": "デスクトップ版を起動",
+    "account.launchCli": "CLIターミナルを起動",
+    "account.launchWeb": "Web版を起動",
+    "account.favorite": "お気に入りに固定",
+    "account.unfavorite": "お気に入り解除",
+    "account.enable": "プロファイルを有効化",
+    "account.disable": "プロファイルを無効化",
+
+    // Settings Modal
+    "settings.title": "設定",
+    "settings.tabs.general": "一般",
+    "settings.tabs.appearance": "テーマと外観",
+    "settings.tabs.language": "言語設定",
+    "settings.tabs.shortcuts": "ショートカット",
+    "settings.tabs.diagnostics": "診断情報",
+
+    // Settings - General
+    "settings.autostart.title": "Windows 起動時に自動開始",
+    "settings.autostart.desc": "PC起動時にバックグラウンドで自動的に起動します。",
+    "settings.startMinimized.title": "トレイに最小化した状態で開始",
+    "settings.startMinimized.desc": "起動時にメインウィンドウを表示せず、トレイに常駐させます。",
+    "settings.closeToTray.title": "閉じる(X)時にトレイへ最小化",
+    "settings.closeToTray.desc": "閉じるボタンをクリックした際、終了せずにトレイに隠します。",
+    "settings.firstCloseNotice.title": "トレイ最小化の案内通知",
+    "settings.firstCloseNotice.desc": "ウィンドウを閉じる際のトレイ動作説明ダイアログを再表示します。",
+    "settings.firstCloseNotice.resetBtn": "案内をリセット",
+
+    // Settings - Appearance
+    "settings.appearance.themeTitle": "カラーテーマ",
+    "settings.theme.system": "システム準拠",
+    "settings.theme.systemDesc": "Windowsのダーク／ライトモード設定に自動追従します",
+    "settings.theme.light": "ライトモード",
+    "settings.theme.lightDesc": "明るくクリアな高コントラスト表示",
+    "settings.theme.dark": "ダークモード",
+    "settings.theme.darkDesc": "目に優しいモダンなダークデザイン",
+
+    // Settings - Language
+    "settings.language.title": "表示言語",
+    "settings.language.desc": "AI Switcherのインターフェースで使用する言語を選択してください。",
+
+    // Settings - Shortcuts
+    "settings.shortcuts.title": "ウィンドウ表示切替ホットキー",
+    "settings.shortcuts.desc": "Windows上のどこからでもこのキーを押してAI Switcherを即座に呼び出せます。",
+    "settings.shortcuts.placeholder": "例: CommandOrControl+Alt+S",
+    "settings.shortcuts.applyBtn": "ホットキーを適用",
+    "settings.shortcuts.modifiersTitle": "使用可能な修飾キー:",
+    "settings.shortcuts.ctrl": "CommandOrControl (WindowsではCtrl)",
+    "settings.shortcuts.alt": "Alt",
+    "settings.shortcuts.shift": "Shift",
+    "settings.shortcuts.example": "例: CommandOrControl+Alt+S または CommandOrControl+Shift+Space",
+
+    // Settings - Diagnostics
+    "settings.diag.appVersion": "アプリバージョン",
+    "settings.diag.activeProcesses": "実行中プロセス数",
+    "settings.diag.storageLocations": "保存先パス",
+    "settings.diag.baseDataDir": "基本データフォルダ:",
+    "settings.diag.capabilities": "プラットフォーム機能状態",
+
+    // Wizard
+    "wizard.title": "アカウントプロファイル登録",
+    "wizard.step1": "1. プラットフォーム",
+    "wizard.step2": "2. 実行環境",
+    "wizard.step3": "3. アカウント情報",
+    "wizard.step4": "4. ワークスペース",
+    "wizard.step5": "5. 登録完了",
+    "wizard.codexNotice": "注意: OpenAI Codex デスクトップ版は現在Windows上で単一インスタンス構成です。プロファイルの完全分離は専用CLI環境でサポートされます。",
+    "wizard.antigravityNotice": "Google Antigravity デスクトッププロファイルは、専用ディレクトリと検証済みCWD実行により完全分離されます。",
+    "wizard.claudeNotice": "Anthropic Claude デスクトッププロファイルは、個別に分離されたユーザーデータディレクトリで動作します。",
+    "wizard.displayName": "表示名",
+    "wizard.displayNamePlaceholder": "例: 業務アカウント, 個人開発, プロジェクトA",
+    "wizard.emailOrId": "アカウント識別子・メールアドレス（任意）",
+    "wizard.emailPlaceholder": "例: dev@company.com",
+    "wizard.defaultWorkspace": "既定のワークスペースフォルダ",
+    "wizard.defaultWorkspacePlaceholder": "フォルダを選択または入力 (例: H:\\dev\\project)",
+    "wizard.browserProfile": "Web・認証用ブラウザプロファイル",
+    "wizard.securityAssurance": "データ保護と完全な分離保証: すべての認証情報と環境設定はローカルのWindows専用フォルダに安全に隔離保管されます。AI Switcherがユーザーのトークンやパスワードを外部送信することはありません。",
+
+    // Workspace Presets Modal
+    "workspace.modalTitle": "ワークスペースプリセット",
+    "workspace.addPreset": "新規ワークスペース登録",
+    "workspace.name": "ワークスペース名",
+    "workspace.path": "フォルダパス",
+    "workspace.preferredAccounts": "優先アカウント割り当て",
+    "workspace.noPresets": "登録されたワークスペースはありません。",
+    "workspace.launchWith": "{platform} で開く",
+
+    // Browser Profiles Modal
+    "browser.modalTitle": "ブラウザプロファイル管理",
+    "browser.addProfile": "新規ブラウザプロファイル",
+    "browser.name": "プロファイル表示名",
+    "browser.kind": "ブラウザ種類",
+    "browser.dataDir": "ユーザーデータディレクトリ",
+    "browser.detectedBrowsers": "検出されたインストール済みブラウザ",
+
+    // Diagnostics & Repair Center
+    "diagCenter.title": "診断＆ヘルスセンター",
+    "diagCenter.dbStatus": "データベース完全性",
+    "diagCenter.backupCount": "利用可能なバックアップ数",
+    "diagCenter.repairAll": "自動整合性チェックと修復",
+    "diagCenter.exportBundle": "サポートバンドル出力",
+    "diagCenter.cleanBundleNotice": "サポートバンドルにはパスワードや認証トークンは含まれず、完全に匿名化されます。",
+
+    // Conflict Dialog
+    "conflict.title": "実行中のプロセスを検出",
+    "conflict.desc": "このプラットフォームの別インスタンスが既に起動しています。続行しますか？",
+    "conflict.force": "強制起動",
+
+    // First Close Dialog
+    "firstClose.title": "AI Switcher 常駐のお知らせ",
+    "firstClose.desc": "ウィンドウを閉じても、AI Switcherはタスクバーのトレイで常駐動作を継続します。トレイアイコンまたはショートカットでいつでも呼び出せます。",
+    "firstClose.dontShowAgain": "次回から表示しない",
+    "firstClose.gotIt": "了解しました",
+  },
+
+  zh: {
+    // App Header & Navigation
+    "app.title": "AI Switcher",
+    "app.subtitle": "Windows 多账号与工作区管理器",
+    "app.addAccount": "添加账号",
+    "app.workspaces": "工作区",
+    "app.browsers": "浏览器配置",
+    "app.settings": "设置",
+    "app.diagnostics": "诊断与修复",
+    "app.refresh": "刷新",
+    "app.showDisabled": "显示已禁用账号",
+    "app.hideDisabled": "隐藏已禁用账号",
+    "app.favorites": "收藏夹",
+    "app.recents": "最近使用",
+    "app.noFavorites": "尚未添加任何收藏账号。",
+    "app.footer.status": "就绪",
+    "app.footer.trayActive": "系统托盘运行中",
+    "app.footer.diagnostics": "健康检查与诊断中心",
+
+    // Common Buttons & Actions
+    "action.save": "保存",
+    "action.cancel": "取消",
+    "action.close": "关闭",
+    "action.delete": "删除",
+    "action.edit": "编辑",
+    "action.rename": "重命名",
+    "action.create": "创建",
+    "action.browse": "浏览...",
+    "action.launch": "启动",
+    "action.login": "登录",
+    "action.logout": "退出登录",
+    "action.repair": "修复",
+    "action.reset": "重置",
+    "action.apply": "应用",
+    "action.saving": "保存中...",
+    "action.loading": "加载中...",
+    "action.confirm": "确认",
+    "action.back": "返回",
+    "action.next": "下一步",
+    "action.finish": "完成并注册",
+    "action.remove": "移除",
+    "action.add": "添加",
+
+    // Status Badges
+    "status.ready": "就绪",
+    "status.running": "运行中",
+    "status.loginRequired": "需要登录",
+    "status.error": "错误",
+    "status.unknown": "未知",
+    "status.disabled": "已禁用",
+
+    // Platform Sections & Account Cards
+    "platform.codex": "OpenAI Codex",
+    "platform.claude": "Anthropic Claude",
+    "platform.antigravity": "Google Antigravity",
+    "platform.noAccounts": "该平台暂无已注册账号。",
+    "platform.addFirstAccount": "注册新账号",
+    "account.identifier": "账号标识",
+    "account.profilePath": "配置路径",
+    "account.defaultWorkspace": "默认工作区",
+    "account.noneSet": "未设置",
+    "account.launchDesktop": "启动桌面客户端",
+    "account.launchCli": "启动命令行终端",
+    "account.launchWeb": "启动网页端",
+    "account.favorite": "固定到收藏",
+    "account.unfavorite": "取消收藏",
+    "account.enable": "启用账号",
+    "account.disable": "禁用账号",
+
+    // Settings Modal
+    "settings.title": "设置",
+    "settings.tabs.general": "常规",
+    "settings.tabs.appearance": "外观与主题",
+    "settings.tabs.language": "语言设置",
+    "settings.tabs.shortcuts": "全局快捷键",
+    "settings.tabs.diagnostics": "诊断信息",
+
+    // Settings - General
+    "settings.autostart.title": "开机自动启动",
+    "settings.autostart.desc": "在 Windows 启动时在后台自动运行 AI Switcher。",
+    "settings.startMinimized.title": "启动时最小化到系统托盘",
+    "settings.startMinimized.desc": "自动或手动启动时保持主窗口隐藏在托盘中。",
+    "settings.closeToTray.title": "关闭(X)时最小化到托盘",
+    "settings.closeToTray.desc": "点击关闭按钮时隐藏至系统托盘，而不是退出程序。",
+    "settings.firstCloseNotice.title": "托盘最小化提示",
+    "settings.firstCloseNotice.desc": "关闭窗口时重新显示托盘运行说明对话框。",
+    "settings.firstCloseNotice.resetBtn": "重置提示",
+
+    // Settings - Appearance
+    "settings.appearance.themeTitle": "界面主题",
+    "settings.theme.system": "跟随系统",
+    "settings.theme.systemDesc": "自动适应 Windows 的明亮/深色模式",
+    "settings.theme.light": "明亮主题",
+    "settings.theme.lightDesc": "清晰鲜明的高对比度日间风格",
+    "settings.theme.dark": "深色主题",
+    "settings.theme.darkDesc": "舒适护眼的现代深色风格",
+
+    // Settings - Language
+    "settings.language.title": "显示语言",
+    "settings.language.desc": "选择 AI Switcher 界面所使用的语言。",
+
+    // Settings - Shortcuts
+    "settings.shortcuts.title": "全局窗口唤醒/隐藏快捷键",
+    "settings.shortcuts.desc": "在 Windows 任意界面按下此快捷键可立即呼出或隐藏 AI Switcher。",
+    "settings.shortcuts.placeholder": "例如: CommandOrControl+Alt+S",
+    "settings.shortcuts.applyBtn": "应用快捷键",
+    "settings.shortcuts.modifiersTitle": "支持的修饰键:",
+    "settings.shortcuts.ctrl": "CommandOrControl (Windows 下为 Ctrl)",
+    "settings.shortcuts.alt": "Alt",
+    "settings.shortcuts.shift": "Shift",
+    "settings.shortcuts.example": "示例: CommandOrControl+Alt+S 或 CommandOrControl+Shift+Space",
+
+    // Settings - Diagnostics
+    "settings.diag.appVersion": "应用版本",
+    "settings.diag.activeProcesses": "活动进程数",
+    "settings.diag.storageLocations": "存储目录",
+    "settings.diag.baseDataDir": "基础数据目录:",
+    "settings.diag.capabilities": "平台功能与隔离状态",
+
+    // Wizard
+    "wizard.title": "注册账号配置",
+    "wizard.step1": "1. 平台选择",
+    "wizard.step2": "2. 运行环境",
+    "wizard.step3": "3. 账号信息",
+    "wizard.step4": "4. 工作区",
+    "wizard.step5": "5. 完成确认",
+    "wizard.codexNotice": "提示: OpenAI Codex 桌面端目前在 Windows 上使用单实例架构。独立的配置隔离在专用的命令行 (CLI) 环境中获得完整支持。",
+    "wizard.antigravityNotice": "Google Antigravity 桌面端配置通过独立的存储目录及经过验证的 CWD 工作区启动实现完全隔离。",
+    "wizard.claudeNotice": "Anthropic Claude 桌面端配置通过独立的专用用户数据目录运行。",
+    "wizard.displayName": "配置显示名称",
+    "wizard.displayNamePlaceholder": "例如: 工作账号, 个人项目, 项目组 A",
+    "wizard.emailOrId": "账号标识符或邮箱 (可选)",
+    "wizard.emailPlaceholder": "例如: dev@company.com",
+    "wizard.defaultWorkspace": "默认工作区目录",
+    "wizard.defaultWorkspacePlaceholder": "选择或输入文件夹路径 (例如: H:\\dev\\project)",
+    "wizard.browserProfile": "网页端与身份验证浏览器配置",
+    "wizard.securityAssurance": "数据安全与隔离保证: 所有账号凭证和环境配置均隔离保存在本地 Windows 目录中。AI Switcher 绝不会拦截或外发您的登录令牌或 API 密钥。",
+
+    // Workspace Presets Modal
+    "workspace.modalTitle": "工作区预设",
+    "workspace.addPreset": "新建工作区预设",
+    "workspace.name": "预设名称",
+    "workspace.path": "目录路径",
+    "workspace.preferredAccounts": "首选账号关联",
+    "workspace.noPresets": "尚未添加任何工作区预设。",
+    "workspace.launchWith": "以 {platform} 启动",
+
+    // Browser Profiles Modal
+    "browser.modalTitle": "浏览器配置管理",
+    "browser.addProfile": "新建浏览器配置",
+    "browser.name": "配置显示名称",
+    "browser.kind": "浏览器类型",
+    "browser.dataDir": "用户数据目录",
+    "browser.detectedBrowsers": "系统已检测到的浏览器",
+
+    // Diagnostics & Repair Center
+    "diagCenter.title": "诊断与健康中心",
+    "diagCenter.dbStatus": "数据库完整性",
+    "diagCenter.backupCount": "现有备份数量",
+    "diagCenter.repairAll": "执行全量自动检查与修复",
+    "diagCenter.exportBundle": "导出诊断支持包",
+    "diagCenter.cleanBundleNotice": "支持包中绝对不包含任何敏感凭据或访问令牌，已全部经过脱敏处理。",
+
+    // Conflict Dialog
+    "conflict.title": "检测到运行中的进程",
+    "conflict.desc": "该平台的另一个实例或会话当前正在运行。是否继续启动？",
+    "conflict.force": "仍要启动",
+
+    // First Close Dialog
+    "firstClose.title": "AI Switcher 托盘运行提示",
+    "firstClose.desc": "关闭主窗口后，AI Switcher 将在任务栏托盘中继续静默运行。您可以随时通过托盘图标或全局快捷键将其唤醒。",
+    "firstClose.dontShowAgain": "不再显示此提示",
+    "firstClose.gotIt": "我知道了",
+  },
+} as const;
+
+export type TranslationKey = keyof typeof translations.en;
