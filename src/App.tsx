@@ -101,16 +101,16 @@ export function App() {
       const next = new Set(favoriteAccountIds);
       if (next.has(account.id)) {
         next.delete(account.id);
-        showNotification(`Removed "${account.displayName}" from Favorites.`, "info");
+        showNotification(t("notify.favoriteRemoved", { name: account.displayName }), "info");
       } else {
         next.add(account.id);
-        showNotification(`Added "${account.displayName}" to Favorites.`, "success");
+        showNotification(t("notify.favoriteAdded", { name: account.displayName }), "success");
       }
       setFavoriteAccountIds(next);
       await refreshTrayMenu();
     } catch (err: any) {
       console.error("Failed to toggle favorite:", err);
-      showNotification("Failed to toggle favorite.", "error");
+      showNotification(t("notify.favoriteFailed"), "error");
     }
   };
 
@@ -121,7 +121,7 @@ export function App() {
       setAccounts(data);
     } catch (err) {
       console.error("Failed to load accounts:", err);
-      showNotification("Failed to load accounts from database.", "error");
+      showNotification(t("notify.loadAccountsFailed"), "error");
     } finally {
       setLoading(false);
     }
@@ -175,7 +175,9 @@ export function App() {
     const nextState = !account.isEnabled;
     await toggleAccountEnabled(account.id, nextState);
     showNotification(
-      `Profile "${account.displayName}" ${nextState ? "enabled" : "disabled"}.`,
+      nextState
+        ? t("notify.profileEnabled", { name: account.displayName })
+        : t("notify.profileDisabled", { name: account.displayName }),
       "info"
     );
     await loadAccounts();
@@ -187,7 +189,7 @@ export function App() {
       displayName: newName,
       accountIdentifier: newIdentifier,
     });
-    showNotification("Account profile updated.", "success");
+    showNotification(t("notify.profileUpdated"), "success");
     await loadAccounts();
   };
 
@@ -199,59 +201,62 @@ export function App() {
     try {
       await deleteAccount(account.id, deleteLocalData, deleteBrowserProfile);
       showNotification(
-        `Profile "${account.displayName}" deleted ${deleteLocalData ? "(including local files)" : ""}.`,
+        t("notify.profileDeleted", {
+          name: account.displayName,
+          extra: deleteLocalData ? t("notify.profileDeletedExtra") : "",
+        }),
         "info"
       );
       await loadAccounts();
     } catch (err: any) {
       console.error("Delete error:", err);
-      showNotification(`Delete failed: ${err?.details || err?.message || String(err)}`, "error");
+      showNotification(t("notify.deleteFailed", { err: err?.details || err?.message || String(err) }), "error");
     }
   };
 
   const handleLogin = async (account: AccountProfile) => {
     try {
-      showNotification(`Opening official sign-in for "${account.displayName}"...`, "info");
+      showNotification(t("notify.loginOpening", { name: account.displayName }), "info");
       const res = await startLoginFlow(account.id);
       showNotification(
-        res.message || "Official sign-in opened. Complete sign-in, then verify.",
+        res.message || t("notify.loginLaunchedDefault"),
         "info"
       );
       await loadAccounts();
     } catch (err: any) {
       console.error("Login launch error:", err);
-      showNotification(`Login launch failed: ${err?.details || err?.message || String(err)}`, "error");
+      showNotification(t("notify.loginLaunchFailed", { err: err?.details || err?.message || String(err) }), "error");
     }
   };
 
   const handleCheckStatus = async (account: AccountProfile, surface?: ExecutionSurface) => {
     try {
       const surfaceLabel = surface ? ` (${surface})` : "";
-      showNotification(`Verifying session${surfaceLabel} for "${account.displayName}"...`, "info");
+      showNotification(t("notify.verifyingSession", { name: account.displayName, surface: surfaceLabel }), "info");
       const status = await checkAccountStatus(account.id, surface);
       if (status === "ready") {
-        showNotification(`"${account.displayName}" is authenticated and ready!`, "success");
+        showNotification(t("notify.authReady", { name: account.displayName }), "success");
       } else if (status === "login_required") {
-        showNotification(`"${account.displayName}": Sign-in required. Please complete sign-in and click Verify.`, "info");
+        showNotification(t("notify.authRequired", { name: account.displayName }), "info");
       } else {
-        showNotification(`"${account.displayName}" status: ${status}`, "info");
+        showNotification(t("notify.authStatus", { name: account.displayName, status }), "info");
       }
       await loadAccounts();
     } catch (err: any) {
       console.error("Status check error:", err);
-      showNotification(`Status check failed: ${err?.details || err?.message || String(err)}`, "error");
+      showNotification(t("notify.statusCheckFailed", { err: err?.details || err?.message || String(err) }), "error");
     }
   };
 
   const handleLogout = async (account: AccountProfile) => {
     try {
-      showNotification(`Logging out "${account.displayName}"...`, "info");
+      showNotification(t("notify.loggingOut", { name: account.displayName }), "info");
       const status = await logoutAccount(account.id);
-      showNotification(`"${account.displayName}" logged out (Status: ${status}).`, "success");
+      showNotification(t("notify.loggedOut", { name: account.displayName, status }), "success");
       await loadAccounts();
     } catch (err: any) {
       console.error("Logout error:", err);
-      showNotification(`Logout failed: ${err?.details || err?.message || String(err)}`, "error");
+      showNotification(t("notify.logoutFailed", { err: err?.details || err?.message || String(err) }), "error");
     }
   };
 
@@ -259,19 +264,23 @@ export function App() {
     try {
       const record = await launchProfile(account.id, surface, workspacePath);
       showNotification(
-        `Launched "${account.displayName}" via ${record.surface}${record.pid ? ` (PID ${record.pid})` : ""}.`,
+        t("notify.launched", {
+          name: account.displayName,
+          surface: record.surface,
+          pid: record.pid ? ` (PID ${record.pid})` : "",
+        }),
         "success"
       );
       await loadAccounts();
     } catch (err: any) {
       console.error("Launch error:", err);
-      showNotification(`Launch failed: ${err?.details || err?.message || String(err)}`, "error");
+      showNotification(t("notify.launchFailed", { err: err?.details || err?.message || String(err) }), "error");
     }
   };
 
   const handleOpen = async (account: AccountProfile, surface?: ExecutionSurface) => {
     if (!account.isEnabled) {
-      showNotification(`Profile "${account.displayName}" is disabled. Enable it before opening.`, "error");
+      showNotification(t("notify.disabledProfile", { name: account.displayName }), "error");
       return;
     }
 
@@ -299,12 +308,18 @@ export function App() {
     try {
       // Gracefully terminate the existing profile
       await terminateProcess(conflict.runningLaunchId, false);
-      showNotification(`Closed "${conflict.runningDisplayName}". Launching "${targetAccount.displayName}"...`, "info");
+      showNotification(
+        t("notify.closedAndSwitching", {
+          running: conflict.runningDisplayName,
+          target: targetAccount.displayName,
+        }),
+        "info"
+      );
       // Launch target profile
       await doLaunch(targetAccount, conflictState?.surface, conflictState?.workspacePath);
     } catch (err: any) {
       console.error("Switch error:", err);
-      showNotification(`Switch failed: ${err?.details || err?.message || String(err)}`, "error");
+      showNotification(t("notify.switchFailed", { err: err?.details || err?.message || String(err) }), "error");
     } finally {
       setConflictState(null);
     }
@@ -479,7 +494,16 @@ export function App() {
           <span className="footer-dot">•</span>
           <span className="text-muted">{t("app.footer.trayActive")}</span>
           <span className="footer-dot">•</span>
-          <span className="text-muted" style={{ textTransform: "capitalize" }}>Theme: {theme}</span>
+          <span className="text-muted">
+            {t("app.footer.theme", {
+              theme:
+                theme === "dark"
+                  ? t("theme.dark")
+                  : theme === "light"
+                  ? t("theme.light")
+                  : t("theme.system"),
+            })}
+          </span>
         </div>
         <div className="footer-right">
           <button className="footer-link" onClick={() => setIsDiagModalOpen(true)}>

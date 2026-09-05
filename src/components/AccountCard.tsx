@@ -38,17 +38,17 @@ export const AccountCard: React.FC<Props> = ({
     account.platform === "claude"
       ? t("account.launchDesktop")
       : account.platform === "codex"
-      ? "Open Codex Desktop"
+      ? t("account.launchCodexDesktop")
       : account.platform === "antigravity"
       ? t("account.launchDesktop")
       : t("action.launch");
 
   const defaultSurfaceTitle =
     account.platform === "codex"
-      ? `Open Codex Desktop (${account.displayName}) - Shared Windows session`
+      ? `${t("account.launchCodexDesktop")} (${account.displayName}) - ${t("account.sharedSessionBadge")}`
       : account.platform === "antigravity"
-      ? `Launch isolated Antigravity Desktop profile (${account.displayName})`
-      : `Launch ${account.displayName}`;
+      ? `${t("account.launchDesktop")} (${account.displayName})`
+      : `${t("action.launch")} ${account.displayName}`;
 
   return (
     <div className={`account-card ${!account.isEnabled ? "account-disabled" : ""}`}>
@@ -77,9 +77,9 @@ export const AccountCard: React.FC<Props> = ({
           {account.platform === "codex" && (
             <span
               className="shared-session-pill"
-              title="Codex Desktop shares a single Windows session across all profiles"
+              title={t("account.sharedSessionTitle")}
             >
-              ⚠️ Shared Windows Desktop session
+              {t("account.sharedSessionBadge")}
             </span>
           )}
           {!account.isEnabled && <span className="disabled-pill">{t("status.disabled")}</span>}
@@ -90,7 +90,26 @@ export const AccountCard: React.FC<Props> = ({
             authStatus={account.authStatus}
             runtimeStatus={account.runtimeStatus}
           />
-          <span className="meta-text">via {account.loginMethod}</span>
+          <span className="meta-text">
+            {t("account.viaMethod", {
+              method:
+                account.loginMethod === "google"
+                  ? t("loginMethod.google")
+                  : account.loginMethod === "email"
+                  ? t("loginMethod.email")
+                  : account.loginMethod === "email_otp"
+                  ? t("loginMethod.emailOtp")
+                  : account.loginMethod === "phone"
+                  ? t("loginMethod.phone")
+                  : account.loginMethod === "passkey"
+                  ? t("loginMethod.passkey")
+                  : account.loginMethod === "oauth"
+                  ? t("loginMethod.oauth")
+                  : account.loginMethod === "other"
+                  ? t("loginMethod.other")
+                  : t("loginMethod.unknown"),
+            })}
+          </span>
           {account.defaultWorkspacePath && (
             <span className="meta-workspace" title={account.defaultWorkspacePath}>
               📁 {account.defaultWorkspacePath.split(/[\\/]/).pop()}
@@ -136,7 +155,7 @@ export const AccountCard: React.FC<Props> = ({
           <button
             className="btn btn-icon"
             onClick={() => setShowMenu(!showMenu)}
-            title="More Options"
+            title={t("account.moreOptions")}
           >
             <MoreVertical size={14} />
           </button>
@@ -153,10 +172,10 @@ export const AccountCard: React.FC<Props> = ({
                         setShowMenu(false);
                         onOpen(account, "cli");
                       }}
-                      title="Open isolated Codex CLI session in external terminal"
+                      title={t("account.launchCodexCliTitle")}
                     >
                       <Terminal size={13} />
-                      Open Codex CLI
+                      {t("account.launchCodexCli")}
                     </button>
 
                     {onCheckStatus && (
@@ -167,10 +186,10 @@ export const AccountCard: React.FC<Props> = ({
                             setShowMenu(false);
                             onCheckStatus(account, "desktop_app");
                           }}
-                          title="Check Codex Desktop session status"
+                          title={t("account.checkDesktopSessionTitle")}
                         >
                           <RotateCw size={13} />
-                          Check Desktop Session
+                          {t("account.checkDesktopSession")}
                         </button>
 
                         <button
@@ -179,10 +198,10 @@ export const AccountCard: React.FC<Props> = ({
                             setShowMenu(false);
                             onCheckStatus(account, "cli");
                           }}
-                          title="Check isolated Codex CLI auth status"
+                          title={t("account.checkCliSessionTitle")}
                         >
                           <RotateCw size={13} />
-                          Check CLI Session
+                          {t("account.checkCliSession")}
                         </button>
                       </>
                     )}
@@ -196,7 +215,7 @@ export const AccountCard: React.FC<Props> = ({
                       setShowMenu(false);
                       onOpen(account, "desktop_app");
                     }}
-                    title="Launch isolated Antigravity Desktop application"
+                    title={t("account.launchDesktop")}
                   >
                     <Play size={13} />
                     {t("account.launchDesktop")}
@@ -211,7 +230,7 @@ export const AccountCard: React.FC<Props> = ({
                         setShowMenu(false);
                         onOpen(account, "desktop_app");
                       }}
-                      title="Open Claude Desktop Code session"
+                      title={t("account.launchDesktop")}
                     >
                       <Play size={13} />
                       {t("account.launchDesktop")}
@@ -223,7 +242,7 @@ export const AccountCard: React.FC<Props> = ({
                         setShowMenu(false);
                         onOpen(account, "cli");
                       }}
-                      title="Launch isolated Claude Code in external terminal"
+                      title={t("account.launchCli")}
                     >
                       <Terminal size={13} />
                       {t("account.launchCli")}
@@ -235,7 +254,7 @@ export const AccountCard: React.FC<Props> = ({
                         setShowMenu(false);
                         onOpen(account, "web");
                       }}
-                      title="Open Claude Web in isolated browser profile"
+                      title={t("account.launchWeb")}
                     >
                       <Globe size={13} />
                       {t("account.launchWeb")}
@@ -249,10 +268,10 @@ export const AccountCard: React.FC<Props> = ({
                             setShowMenu(false);
                             onCheckStatus(account, "desktop_app");
                           }}
-                          title="Check Claude Desktop session status"
+                          title={t("account.checkDesktopSessionTitle")}
                         >
                           <RotateCw size={13} />
-                          Check Desktop Session
+                          {t("account.checkDesktopSession")}
                         </button>
 
                         <button
@@ -261,10 +280,10 @@ export const AccountCard: React.FC<Props> = ({
                             setShowMenu(false);
                             onCheckStatus(account, "cli");
                           }}
-                          title="Check Claude CLI auth status"
+                          title={t("account.checkCliSessionTitle")}
                         >
                           <RotateCw size={13} />
-                          Check CLI Session
+                          {t("account.checkCliSession")}
                         </button>
                       </>
                     )}
@@ -284,7 +303,7 @@ export const AccountCard: React.FC<Props> = ({
                     }}
                   >
                     <KeyRound size={13} />
-                    {account.authStatus === "login_required" ? t("action.login") : "Re-authenticate"}
+                    {account.authStatus === "login_required" ? t("action.login") : t("account.reauthenticate")}
                   </button>
                 )}
 

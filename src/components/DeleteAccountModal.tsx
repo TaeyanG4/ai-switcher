@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import { AlertTriangle, X } from "lucide-react";
 import { AccountProfile } from "../types";
 import { useI18n } from "../i18n/I18nContext";
@@ -55,7 +55,7 @@ export const DeleteAccountModal: React.FC<Props> = ({
 
         <div className="modal-body">
           <p>
-            Are you sure you want to remove <strong>{account.displayName}</strong> from AI Switcher?
+            {t("delete.confirmTitle", { name: account.displayName })}
           </p>
 
           <div className="delete-options-box" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -66,10 +66,9 @@ export const DeleteAccountModal: React.FC<Props> = ({
                 onChange={(e) => setDeleteLocalData(e.target.checked)}
               />
               <div>
-                <strong>Also delete local environment data & session tokens</strong>
+                <strong>{t("delete.deleteDataLabel")}</strong>
                 <div className="form-hint">
-                  Permanently deletes the isolated folder <code>{account.profilePath}</code>.
-                  Leave unchecked to keep session data on disk.
+                  {t("delete.deleteDataHint", { path: account.profilePath })}
                 </div>
               </div>
             </label>
@@ -78,7 +77,7 @@ export const DeleteAccountModal: React.FC<Props> = ({
               <>
                 {isBrowserProfileShared ? (
                   <div className="alert alert-warning" style={{ fontSize: 11 }}>
-                    Linked browser profile is shared by {sharedCount - 1} other account(s) and will be preserved.
+                    {t("delete.browserSharedNotice", { count: sharedCount - 1 })}
                   </div>
                 ) : (
                   <label className="checkbox-row">
@@ -88,9 +87,9 @@ export const DeleteAccountModal: React.FC<Props> = ({
                       onChange={(e) => setDeleteBrowserProfile(e.target.checked)}
                     />
                     <div>
-                      <strong>Also delete linked browser profile</strong>
+                      <strong>{t("delete.deleteBrowserLabel")}</strong>
                       <div className="form-hint">
-                        Removes the dedicated browser user-data directory and cookies.
+                        {t("delete.deleteBrowserHint")}
                       </div>
                     </div>
                   </label>

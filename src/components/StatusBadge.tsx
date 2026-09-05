@@ -37,8 +37,8 @@ export const StatusBadge: React.FC<Props> = ({ status, authStatus, runtimeStatus
         </span>
       )}
       {effectiveAuth === "pending" && (
-        <span className="status-badge status-pending" title="Auth: Waiting for sign-in">
-          <span className="status-dot">◌</span> Waiting for sign-in
+        <span className="status-badge status-pending" title={`Auth: ${t("status.waitingForSignIn")}`}>
+          <span className="status-dot">◌</span> {t("status.waitingForSignIn")}
         </span>
       )}
       {effectiveAuth === "error" && (

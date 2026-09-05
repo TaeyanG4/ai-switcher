@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import { AlertCircle, X } from "lucide-react";
 import { AccountProfile, ProcessConflictInfo } from "../types";
 import { useI18n } from "../i18n/I18nContext";
@@ -60,7 +60,7 @@ export const ConflictDialog: React.FC<Props> = ({
 
           <div className="delete-options-box" style={{ margin: "8px 0" }}>
             <div>
-              <strong>Currently Active:</strong> {conflict.runningDisplayName}
+              <strong>{t("conflict.currentlyActive")}</strong> {conflict.runningDisplayName}
               {conflict.runningPid && (
                 <span className="text-muted text-xs" style={{ marginLeft: 6 }}>
                   (PID: {conflict.runningPid})
@@ -68,13 +68,16 @@ export const ConflictDialog: React.FC<Props> = ({
               )}
             </div>
             <div style={{ marginTop: 4 }}>
-              <strong>Requested Target:</strong> {targetAccount.displayName}
+              <strong>{t("conflict.requestedTarget")}</strong> {targetAccount.displayName}
             </div>
           </div>
 
           <p className="text-secondary text-xs">
-            {platformName}: Close <strong>{conflict.runningDisplayName}</strong> and switch to{" "}
-            <strong>{targetAccount.displayName}</strong>?
+            {t("conflict.confirmSwitch", {
+              platform: platformName,
+              running: conflict.runningDisplayName,
+              target: targetAccount.displayName,
+            })}
           </p>
         </div>
 
