@@ -12,7 +12,8 @@ use ai_switcher_lib::browser::safety::{
 use ai_switcher_lib::browser::BrowserProfileManager;
 use ai_switcher_lib::db::Db;
 use ai_switcher_lib::models::{
-    AccountProfile, AccountStatus, BrowserKind, BrowserProfile, LoginMethod, PlatformType,
+    AccountProfile, AccountStatus, AuthStatus, BrowserKind, BrowserProfile, LoginMethod,
+    PlatformType, RuntimeStatus,
 };
 
 struct TestDir {
@@ -223,6 +224,8 @@ fn test_reference_safe_deletion_in_db() {
         account_identifier: Some("work@example.com".to_string()),
         login_method: LoginMethod::EmailOtp,
         status: AccountStatus::Ready,
+        auth_status: AuthStatus::Authenticated,
+        runtime_status: RuntimeStatus::Stopped,
         profile_path: temp
             .path()
             .join("claude")

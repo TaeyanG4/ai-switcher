@@ -99,6 +99,10 @@ impl ProcessManager {
         active.iter().any(|r| r.account_id == account_id)
     }
 
+    pub fn has_running_process(&self, account_id: &str) -> bool {
+        self.is_account_running(account_id)
+    }
+
     /// Checks for a same-platform conflict when launching `target_account`.
     /// INVARIANT: Other platforms (e.g. Codex vs Claude vs Antigravity) NEVER conflict!
     pub fn check_platform_conflict(

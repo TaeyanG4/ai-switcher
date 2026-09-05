@@ -16,8 +16,8 @@ use ai_switcher_lib::launcher::desktop::DesktopAppLauncher;
 use ai_switcher_lib::launcher::process_manager::ProcessManager;
 use ai_switcher_lib::launcher::LauncherEngine;
 use ai_switcher_lib::models::{
-    AccountProfile, AccountStatus, ExecutionSurface, LoginMethod, PlatformType, ProfileHealth,
-    WorkspacePreset,
+    AccountProfile, AccountStatus, AuthStatus, ExecutionSurface, LoginMethod, PlatformType,
+    ProfileHealth, RuntimeStatus, WorkspacePreset,
 };
 
 struct TestEnv {
@@ -192,11 +192,11 @@ fn test_database_backup_and_retention() {
 fn test_database_integrity_and_schema_version() {
     let env = TestEnv::new();
     assert!(env.db.check_integrity().unwrap());
-    assert_eq!(env.db.get_schema_version().unwrap(), 4);
+    assert_eq!(env.db.get_schema_version().unwrap(), 5);
 }
 
 #[test]
-fn test_database_migration_v1_to_v4() {
+fn test_database_migration_v1_to_v5() {
     let unique = Uuid::new_v4().to_string();
     let temp_dir = std::env::temp_dir().join(format!("ai_switcher_mig_test_{}", unique));
     fs::create_dir_all(&temp_dir).unwrap();
@@ -257,17 +257,18 @@ fn test_database_migration_v1_to_v4() {
         .unwrap();
     }
 
-    // Now open via Db::init, which must run migrations up to v4
+    // Now open via Db::init, which must run migrations up to v5
     let upgraded_db = Db::init(&db_path).unwrap();
-    assert_eq!(upgraded_db.get_schema_version().unwrap(), 4);
+    assert_eq!(upgraded_db.get_schema_version().unwrap(), 5);
 
-    // Verify existing v1 data survived intact
+    // Verify existing v1 data survived intact and auth_status was populated
     let acc = upgraded_db.get_account("acc-1").unwrap();
     assert_eq!(acc.display_name, "Claude V1");
     assert_eq!(acc.platform, PlatformType::Claude);
     assert_eq!(acc.browser_profile_id, None);
+    assert_eq!(acc.auth_status, AuthStatus::Authenticated);
 
-    // Verify v2/v3/v4 tables exist and work
+    // Verify v2/v3/v4/v5 tables exist and work
     assert!(upgraded_db.list_favorites().is_ok());
     assert!(upgraded_db.list_browser_profiles().is_ok());
 
@@ -292,6 +293,8 @@ fn test_profile_health_and_repair_structure() {
         account_identifier: Some("dev@google.com".to_string()),
         login_method: LoginMethod::Google,
         status: AccountStatus::Ready,
+        auth_status: AuthStatus::Authenticated,
+        runtime_status: RuntimeStatus::Stopped,
         profile_path: profile_path.to_str().unwrap().to_string(),
         browser_profile_path: None,
         browser_profile_id: None,
@@ -458,5 +461,5 @@ fn test_support_bundle_is_sanitized() {
     assert!(!serialized.contains("password"));
     assert!(!serialized.contains("client_secret"));
     assert!(bundle.db_integrity_ok);
-    assert_eq!(bundle.schema_version, 4);
+    assert_eq!(bundle.schema_version, 5);
 }

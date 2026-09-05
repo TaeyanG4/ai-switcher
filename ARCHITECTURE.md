@@ -145,15 +145,15 @@ pub trait PlatformAdapter: Send + Sync {
 #### `CodexAdapter`
 - **Detection:** Checks PATH for `codex.exe`, inspects `%LOCALAPPDATA%\OpenAI\Codex\bin\*\codex.exe` and `%LOCALAPPDATA%\Programs\OpenAI\Codex\bin\codex.exe`. Detects `OpenAI.Codex` MSIX package.
 - **Initialization:** Creates profile folder, sets up default `config.toml` structure, `log/`, and `tmp/`.
-- **Status Check:** Runs `codex.exe login status` with `CODEX_HOME=<profile_path>`. Parses exit code (0 -> `Ready`, 1 -> `LoginRequired`). Probes isolated CLI backend credentials.
+- **Status Check:** Runs `codex.exe login status` with `CODEX_HOME=<profile_path>`. Parses exit code (0 -> `Ready`/`Authenticated`, 1 -> `LoginRequired`). Probes isolated CLI backend credentials.
 - **Launch Spec:**
-  - Desktop target: calls `codex.exe app <workspace_path>` to open workspace in native Codex Desktop GUI.
-  - CLI target: spawns external terminal running `codex.exe` with `CODEX_HOME=<profile_path>` for isolated CLI sessions.
+  - CLI target (**Primary / Default**): Spawns external terminal running `codex.exe` with `CODEX_HOME=<profile_path>` for isolated CLI sessions (`[Open Codex CLI]`).
+  - Desktop target: Calls `codex.exe app <workspace_path>` to open workspace in native Codex Desktop GUI (labeled `Open Codex Desktop (Shared Session)` with explicit warning).
 - **Logout:** Executes `codex.exe logout` with `CODEX_HOME` and cleans up profile credentials.
 - **Verified Boundaries & Known Limitations:**
-  - CLI profile isolation is **verified** via `CODEX_HOME`.
+  - CLI profile isolation is **verified** via `CODEX_HOME`. Real ChatGPT accounts verified live on Windows host.
   - Desktop workspace launch is **verified** via `codex app [PATH]`.
-  - Desktop account-profile isolation is **unsupported/unverified** because Windows MSIX protocol activation routes through `RuntimeBroker` without propagating ephemeral in-memory environment variables.
+  - Desktop account-profile isolation is **unsupported/unverified** because Windows MSIX protocol activation routes through `RuntimeBroker` without propagating ephemeral in-memory environment variables, sharing the global Windows session.
   - Codex Desktop concurrent instances are **unsupported** (`InstancePolicy::SingleInstance` enforced).
   - AI Switcher maintains a strict separation: **Codex CLI Account Profile** vs **Codex Desktop Session**, and does not use unsupported token swapping or MSIX modifications.
 
@@ -178,8 +178,9 @@ pub trait PlatformAdapter: Send + Sync {
   - `ExecutionSurface::Cli`: spawns `wt.exe -d <workspace_path> claude.exe` with `CLAUDE_CONFIG_DIR=<profile_path>\cli`.
   - `ExecutionSurface::Web`: launches isolated Chromium browser via `BrowserProfileManager` navigating to `https://claude.ai`.
 - **Status Probing:**
-  - Probes auth status via `claude auth status --json` with `CLAUDE_CONFIG_DIR=<profile_path>\cli`. Parses returned `{"loggedIn": bool}` (`ready` vs `login_required`).
-- **Logout:** Executes `claude auth logout` with `CLAUDE_CONFIG_DIR` and cleans up isolated CLI/Desktop credential caches.
+  - Desktop session probing: Directly inspects SQLite database `<profile_path>\desktop\Network\Cookies` for authenticated cookie `host_key LIKE '%claude.ai%' AND name = 'sessionKey'`. Cloudflare anonymous cookies (`cf_clearance`) are excluded to avoid false positives.
+  - CLI session probing: Only probed if Desktop is not installed via `claude auth status --json` with `CLAUDE_CONFIG_DIR=<profile_path>\cli`. Missing CLI strictly returns `LoginRequired` (never `Ready`).
+- **Logout:** Clears isolated `Network/Cookies`, `Local Storage`, and `Session Storage` in `<profile_path>\desktop` and executes `claude auth logout` for CLI.
 
 #### `AntigravityAdapter` (Desktop-First)
 - **Primary Execution Surface:** `ExecutionSurface::DesktopApp` launches the native Antigravity Desktop application (`Antigravity.exe`).
@@ -199,8 +200,11 @@ pub trait PlatformAdapter: Send + Sync {
 - **Session & Profile Isolation Guarantees (Verified Live):**
   - Live host testing confirmed `--user-data-dir` completely isolates Chromium storage in `<profile>\data`.
   - Live host testing confirmed overriding `USERPROFILE` directs both Node.js runtime and Go `language_server.exe` to isolate `.gemini` state inside `<profile>\home\.gemini`, leaving the user's real `%USERPROFILE%\.gemini` and `%APPDATA%\Antigravity` 100% untouched.
+- **Protocol Callback Broker Subsystem:**
+  - When login is initiated, AI Switcher hooks the Windows HKCU protocol registration (`antigravity://`) to route through the headless CLI broker `ai-switcher.exe --broker-protocol antigravity "%1"`.
+  - The broker captures incoming OAuth callback deep-links and relaunches Antigravity with the isolated `--user-data-dir` and environment, ensuring Google OAuth credentials land in `<profile>\home\.gemini\oauth_creds.json`.
 - **Concurrency & Multi-Instance Support (Verified Live):**
-  - Live tested concurrent execution: Profile A (PID 23220) and Profile B (PID 28164) ran simultaneously as separate process trees with independent directories while the host instance also ran (`InstancePolicy::MultiInstance`).
+  - Antigravity supports `InstancePolicy::MultiInstance` across distinct `--user-data-dir` profiles.
 - **Workspace Launch Limitation (Verified):**
   - Antigravity's Electron `main.js` only parses `antigravity://` deep links and Chromium flags; bare positional folder arguments are ignored.
   - Workspace opening is initiated inside the GUI via project history or `dialog:open-workspace`. AI Switcher sets process working directory (`cwd`) to the target workspace.
@@ -266,6 +270,51 @@ The Browser Profile Engine provides persistent, isolated Chromium browser enviro
 
 4. **Integration with Generic Launcher:**
    - When an account is launched with `ExecutionSurface::Web` (e.g., Claude Web), the launcher automatically routes to the account's linked `BrowserProfile`.
+
+---
+
+### 3.8 Decoupled Authentication & Runtime Architecture
+
+AI Switcher cleanly decouples persistent authentication state from ephemeral in-memory runtime execution state:
+
+1. **`AuthStatus` (Persistent SQLite Storage):**
+   - `Authenticated`: Validated credentials or session cookie present on disk.
+   - `LoginRequired`: No credentials present or logged out.
+   - `Pending`: Official login interface was spawned; awaiting user authentication and verification.
+   - `Unknown`: Authentication cannot be established without launching or probing.
+   - `Error`: Corrupted profile or unreadable session store.
+
+2. **`RuntimeStatus` (Dynamic In-Memory Tracking):**
+   - `Stopped`: No active child processes running for this account profile.
+   - `Running`: Active process running tracked via `ProcessManager`.
+   - `Unknown`: Process state cannot be determined.
+
+3. **Separation Invariant:**
+   - Launching an application NEVER changes persistent `AuthStatus` to `Authenticated`.
+   - Terminating an application NEVER changes persistent `AuthStatus` to `LoginRequired`.
+   - Spawning a login helper process NEVER registers the account as `RuntimeStatus::Running` or adds it to `recent_launches`.
+
+---
+
+### 3.9 Protocol Callback Broker Subsystem (`src-tauri/src/protocol_broker.rs`)
+
+When third-party Electron applications (such as Antigravity) use Google OAuth via browser redirect, the callback is dispatched as a Windows custom URI deep link (e.g., `antigravity://auth/callback?...`).
+
+1. **The Architecture Problem:**
+   - Windows default protocol associations run `Antigravity.exe "%1"` with host defaults (no `--user-data-dir`, default `%USERPROFILE%`).
+   - This causes OAuth tokens to be written into the global host profile (`%USERPROFILE%\.gemini\oauth_creds.json`), leaving the isolated AI Switcher profile unauthenticated.
+
+2. **Headless Broker Mechanism:**
+   - During active login flows, AI Switcher hooks the HKCU protocol command:
+     `"C:\path\to\ai-switcher.exe" --broker-protocol <protocol> "%1"`
+   - The original protocol handler command is backed up to `%APPDATA%\AI-Switcher\protocol_backups\<protocol>.txt`.
+   - When the browser navigates to the callback URL:
+     - `ai-switcher.exe --broker-protocol` starts headlessly without launching the Tauri GUI window.
+     - Execution completes in < 10ms.
+     - The broker matches the incoming protocol against active `PendingAuthFlow` records in `%APPDATA%\AI-Switcher\pending_auth.json`.
+     - The target application is spawned with the isolated `--user-data-dir`, `USERPROFILE`, `HOME`, and `APPDATA`.
+     - The sensitive URL query string is automatically redacted in all logging outputs.
+   - On application startup or verification completion, `restore_all_protocols()` restores original registry handlers, guaranteeing zero system side-effects even after unexpected crashes.
 
 ---
 

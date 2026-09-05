@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import { Folder, MoreVertical, Play, Trash2, EyeOff, Eye, Edit2, Terminal, Globe, RotateCw, LogOut, KeyRound, Star } from "lucide-react";
 import { AccountProfile, ExecutionSurface } from "../types";
 import { StatusBadge } from "./StatusBadge";
@@ -38,14 +38,14 @@ export const AccountCard: React.FC<Props> = ({
     account.platform === "claude"
       ? t("account.launchDesktop")
       : account.platform === "codex"
-      ? t("account.launchDesktop")
+      ? "Open Codex CLI"
       : account.platform === "antigravity"
       ? t("account.launchDesktop")
       : t("action.launch");
 
   const defaultSurfaceTitle =
     account.platform === "codex"
-      ? `Open workspace in Codex Desktop (${account.displayName})`
+      ? `Open isolated Codex CLI session (${account.displayName})`
       : account.platform === "antigravity"
       ? `Launch isolated Antigravity Desktop profile (${account.displayName})`
       : `Launch ${account.displayName}`;
@@ -77,7 +77,11 @@ export const AccountCard: React.FC<Props> = ({
           {!account.isEnabled && <span className="disabled-pill">{t("status.disabled")}</span>}
         </div>
         <div className="account-meta">
-          <StatusBadge status={account.status} />
+          <StatusBadge
+            status={account.status}
+            authStatus={account.authStatus}
+            runtimeStatus={account.runtimeStatus}
+          />
           <span className="meta-text">via {account.loginMethod}</span>
           {account.defaultWorkspacePath && (
             <span className="meta-workspace" title={account.defaultWorkspacePath}>
@@ -103,11 +107,15 @@ export const AccountCard: React.FC<Props> = ({
 
         <button
           className="btn btn-primary"
-          onClick={() => onOpen(account)}
+          onClick={() => onOpen(account, account.platform === "codex" ? "cli" : undefined)}
           disabled={!account.isEnabled}
           title={defaultSurfaceTitle}
         >
-          <Play size={13} style={{ marginRight: 4 }} />
+          {account.platform === "codex" ? (
+            <Terminal size={13} style={{ marginRight: 4 }} />
+          ) : (
+            <Play size={13} style={{ marginRight: 4 }} />
+          )}
           {defaultSurfaceLabel}
         </button>
 
@@ -138,12 +146,18 @@ export const AccountCard: React.FC<Props> = ({
                     className="dropdown-item"
                     onClick={() => {
                       setShowMenu(false);
-                      onOpen(account, "cli");
+                      if (
+                        window.confirm(
+                          "Codex Desktop runs in a single shared Windows session and does not support multi-profile isolation. Proceed to open shared desktop session?"
+                        )
+                      ) {
+                        onOpen(account, "desktop_app");
+                      }
                     }}
-                    title="Launch isolated account in external terminal"
+                    title="Open Codex Desktop (Shared Windows Session)"
                   >
-                    <Terminal size={13} />
-                    {t("account.launchCli")}
+                    <Play size={13} />
+                    Open Codex Desktop (Shared Session)
                   </button>
                 )}
 

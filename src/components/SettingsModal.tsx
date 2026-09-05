@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   X,
   Settings,
@@ -404,7 +404,7 @@ export const SettingsModal: React.FC<Props> = ({
                   <div className="diag-grid">
                     <div className="diag-card">
                       <span className="diag-label">{t("settings.diag.appVersion")}</span>
-                      <span className="diag-value">v0.1.0</span>
+                      <span className="diag-value">v0.2.0</span>
                     </div>
                     <div className="diag-card">
                       <span className="diag-label">{t("settings.diag.activeProcesses")}</span>

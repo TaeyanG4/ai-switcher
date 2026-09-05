@@ -400,3 +400,33 @@
 **Phase 11 Acceptance Criteria:**
 - Standalone installer builds cleanly and successfully installs/uninstalls on a clean Windows machine. (Verified)
 - All unit, integration, and platform tests pass 100%. (Verified: 87/87 tests green)
+
+---
+
+## Phase 12 — Critical Authentication & Session Hotfix
+
+- [x] **12.1 Authentication & Runtime Decoupling**
+  - Defined `AuthStatus` (`authenticated`, `login_required`, `pending`, `unknown`, `error`) and `RuntimeStatus` (`stopped`, `running`, `unknown`).
+  - Added SQLite migration v5: added `auth_status` column and index, migrated legacy statuses (`ready` -> `authenticated`, reset stale `running` to `login_required`).
+  - Separated launch lifecycle from authentication state: launching an app no longer overwrites persistent `AuthStatus` in SQLite.
+- [x] **12.2 Login Process Semantics ("Launched" != "Authenticated")**
+  - Replaced ambiguous "Login process launched" success message with "Official sign-in opened. Complete sign-in, then verify."
+  - Created `AuthFlowStartResult` struct returning safe metadata without registering authentication helper processes in `ProcessManager` or `recent_launches`.
+- [x] **12.3 Codex CLI & Desktop Surface Truthfulness**
+  - Made Codex CLI (`ExecutionSurface::Cli`) the primary surface for isolated Codex profiles (`[Open Codex CLI]`).
+  - Re-labeled Codex Desktop action as `Open Codex Desktop (Shared Session)` with explicit warning modal explaining that Codex Desktop shares a single global Windows session.
+  - Verified `check_status` executes `codex login status` with `CODEX_HOME` and parses exit code strictly (0 -> `Authenticated`, 1 -> `LoginRequired`).
+- [x] **12.4 Claude Desktop Verification Fix**
+  - Replaced CLI-based check with direct inspection of `<profile>/desktop/Network/Cookies` SQLite database for `host_key LIKE '%claude.ai%' AND name = 'sessionKey'`.
+  - Excluded anonymous Cloudflare cookies to prevent false `Ready` reports.
+  - Ensured missing Claude CLI strictly returns `LoginRequired` (never `Ready`).
+- [x] **12.5 Antigravity Protocol Callback Broker**
+  - Created headless `--broker-protocol <protocol> "%1"` interceptor executing in < 10ms.
+  - Implemented `PendingAuthFlow` tracking and automatic HKCU registry hooking/restoration (`restore_all_protocols()`).
+  - Redacted OAuth callback query parameters in all log outputs.
+- [x] **12.6 Live Host E2E Verification & Test Suite**
+  - Added `tests/protocol_broker_and_auth_status_tests.rs`.
+  - All 89 unit and integration tests passing (`cargo test`).
+  - Frontend production build compiles cleanly (`pnpm build`).
+  - Verified real host accounts on Windows (`user1`–`user4` Codex authenticated, `user 5` Claude login_required, `user6` Antigravity login_required).
+

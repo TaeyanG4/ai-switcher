@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 use ai_switcher_lib::adapters::codex::CodexAdapter;
 use ai_switcher_lib::adapters::PlatformAdapter;
 use ai_switcher_lib::models::{
-    AccountProfile, AccountStatus, ExecutionSurface, InstancePolicy, LaunchTarget, LoginMethod,
-    PlatformType,
+    AccountProfile, AccountStatus, AuthStatus, ExecutionSurface, InstancePolicy, LaunchTarget,
+    LoginMethod, PlatformType, RuntimeStatus,
 };
 
 struct TestDir {
@@ -37,6 +37,8 @@ fn create_test_profile(profile_path: &Path, display_name: &str) -> AccountProfil
         account_identifier: Some("test@example.com".to_string()),
         login_method: LoginMethod::Google,
         status: AccountStatus::Ready,
+        auth_status: AuthStatus::Authenticated,
+        runtime_status: RuntimeStatus::Stopped,
         profile_path: profile_path.to_string_lossy().to_string(),
         browser_profile_path: None,
         browser_profile_id: None,
@@ -61,7 +63,7 @@ fn test_codex_adapter_metadata() {
         adapter.supported_surfaces(),
         vec![ExecutionSurface::DesktopApp, ExecutionSurface::Cli]
     );
-    assert_eq!(adapter.default_surface(), ExecutionSurface::DesktopApp);
+    assert_eq!(adapter.default_surface(), ExecutionSurface::Cli);
 }
 
 #[test]

@@ -1,4 +1,4 @@
-﻿# AI Switcher (简体中文)
+# AI Switcher (简体中文)
 
 <p align="center">
   <strong>专为 OpenAI Codex、Anthropic Claude 和 Google Antigravity 设计的 Windows 多账号与工作区管理器</strong>
@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Release-v0.1.0-blue.svg" alt="Release v0.1.0" />
+  <img src="https://img.shields.io/badge/Release-v0.2.0-blue.svg" alt="Release v0.2.0" />
   <img src="https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D6.svg" alt="Windows 10/11" />
   <img src="https://img.shields.io/badge/Framework-Tauri%202-FFC131.svg" alt="Tauri 2" />
   <img src="https://img.shields.io/badge/Rust-Backend-dea584.svg" alt="Rust" />
@@ -97,9 +97,9 @@
 
 ## 📦 安装与下载
 
-已编译的 Windows 安装程序可直接在 [Releases 页面](https://github.com/TaeyanG4/ai-switcher/releases/tag/v0.1.0) 下载：
+已编译的 Windows 安装程序可直接在 [Releases 页面](https://github.com/TaeyanG4/ai-switcher/releases/tag/v0.2.0) 下载：
 
-1. 下载 **`AI Switcher_0.1.0_x64-setup.exe`**。
+1. 下载 **`AI Switcher_0.2.0_x64-setup.exe`**。
 2. 双击运行安装（默认安装至 `%LOCALAPPDATA%\AI Switcher`，无需管理员权限）。
 3. 从“开始菜单”或桌面快捷方式启动 **AI Switcher**。
 

@@ -6,7 +6,8 @@ use ai_switcher_lib::launcher::{
     CliLauncher, DesktopAppLauncher, LauncherEngine, ProcessManager, WebLauncher,
 };
 use ai_switcher_lib::models::{
-    AccountProfile, AccountStatus, ExecutionSurface, InstancePolicy, LoginMethod, PlatformType,
+    AccountProfile, AccountStatus, AuthStatus, ExecutionSurface, InstancePolicy, LoginMethod,
+    PlatformType, RuntimeStatus,
 };
 
 #[test]
@@ -129,7 +130,8 @@ fn test_cli_command_powershell_login_auto_closes() {
     let args = vec!["login".to_string()];
     let env = vec![("CODEX_HOME".to_string(), "C:\\Profiles\\Codex".to_string())];
 
-    let cmd = CliLauncher::build_powershell_command("user2 Official Login", workdir, exec, &args, &env);
+    let cmd =
+        CliLauncher::build_powershell_command("user2 Official Login", workdir, exec, &args, &env);
 
     assert_eq!(cmd.get_program().to_string_lossy(), "powershell.exe");
     let cmd_args: Vec<String> = cmd
@@ -366,6 +368,8 @@ fn make_account(id: &str, platform: PlatformType, name: &str) -> AccountProfile 
         account_identifier: None,
         login_method: LoginMethod::Google,
         status: AccountStatus::Ready,
+        auth_status: AuthStatus::Authenticated,
+        runtime_status: RuntimeStatus::Stopped,
         profile_path: format!("C:\\profiles\\{}", id),
         browser_profile_path: None,
         browser_profile_id: None,

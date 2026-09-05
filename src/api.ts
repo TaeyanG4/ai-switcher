@@ -6,6 +6,7 @@ import {
   AccountProfile,
   AccountStatus,
   AppSettings,
+  AuthFlowStartResult,
   BrowserProfile,
   CreateAccountInput,
   CreateBrowserProfileInput,
@@ -65,8 +66,8 @@ export async function cleanupDraftAccount(id: string): Promise<void> {
   await invoke("cleanup_draft_account", { id });
 }
 
-export async function startLoginFlow(id: string): Promise<ProcessRecord> {
-  return await invoke<ProcessRecord>("start_login_flow", { id });
+export async function startLoginFlow(id: string): Promise<AuthFlowStartResult> {
+  return await invoke<AuthFlowStartResult>("start_login_flow", { id });
 }
 
 export async function checkAccountStatus(id: string): Promise<AccountStatus> {

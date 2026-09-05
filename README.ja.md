@@ -1,4 +1,4 @@
-﻿# AI Switcher (日本語)
+# AI Switcher (日本語)
 
 <p align="center">
   <strong>OpenAI Codex、Anthropic Claude、Google Antigravity 対応の Windows マルチアカウント＆ワークスペース管理ツール</strong>
@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Release-v0.1.0-blue.svg" alt="Release v0.1.0" />
+  <img src="https://img.shields.io/badge/Release-v0.2.0-blue.svg" alt="Release v0.2.0" />
   <img src="https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D6.svg" alt="Windows 10/11" />
   <img src="https://img.shields.io/badge/Framework-Tauri%202-FFC131.svg" alt="Tauri 2" />
   <img src="https://img.shields.io/badge/Rust-Backend-dea584.svg" alt="Rust" />
@@ -97,9 +97,9 @@ Windows 上のどのウィンドウを開いていても、設定したキー（
 
 ## 📦 インストール方法
 
-コンパイル済みの Windows インストーラーは [Releases ページ](https://github.com/TaeyanG4/ai-switcher/releases/tag/v0.1.0) からダウンロードできます。
+コンパイル済みの Windows インストーラーは [Releases ページ](https://github.com/TaeyanG4/ai-switcher/releases/tag/v0.2.0) からダウンロードできます。
 
-1. **`AI Switcher_0.1.0_x64-setup.exe`** をダウンロード。
+1. **`AI Switcher_0.2.0_x64-setup.exe`** をダウンロード。
 2. インストーラーを実行（管理者権限不要で `%LOCALAPPDATA%\AI Switcher` に安全にインストールされます）。
 3. スタートメニューまたはデスクトップから **AI Switcher** を起動。
 

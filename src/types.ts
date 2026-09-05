@@ -21,6 +21,24 @@ export type AccountStatus =
   | 'unknown'
   | 'error';
 
+export type AuthStatus =
+  | 'authenticated'
+  | 'login_required'
+  | 'pending'
+  | 'unknown'
+  | 'error';
+
+export type RuntimeStatus = 'stopped' | 'running' | 'unknown';
+
+export interface AuthFlowStartResult {
+  platform: PlatformType;
+  flowType: string;
+  processStarted: boolean;
+  helperPid?: number | null;
+  verificationMode: string;
+  message: string;
+}
+
 export type BrowserKind = 'chrome' | 'edge' | 'brave' | 'custom';
 
 export interface BrowserProfile {
@@ -62,6 +80,8 @@ export interface AccountProfile {
   accountIdentifier?: string | null;
   loginMethod: LoginMethod;
   status: AccountStatus;
+  authStatus?: AuthStatus;
+  runtimeStatus?: RuntimeStatus;
   profilePath: string;
   browserProfilePath?: string | null;
   browserProfileId?: string | null;

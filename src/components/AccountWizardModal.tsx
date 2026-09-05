@@ -25,6 +25,7 @@ import {
 import {
   AccountProfile,
   AccountStatus,
+  AuthFlowStartResult,
   BrowserKind,
   BrowserProfile,
   LoginMethod,
@@ -73,9 +74,10 @@ export const AccountWizardModal: React.FC<Props> = ({
   const [scaffolding, setScaffolding] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Step 5: Official Auth
+  // Step 5: Official Authentication
   const [isLaunchingAuth, setIsLaunchingAuth] = useState(false);
   const [authLaunched, setAuthLaunched] = useState(false);
+  const [authFlowResult, setAuthFlowResult] = useState<AuthFlowStartResult | null>(null);
 
   // Step 6: Verification
   const [isVerifying, setIsVerifying] = useState(false);
@@ -119,6 +121,7 @@ export const AccountWizardModal: React.FC<Props> = ({
     setError(null);
     setIsLaunchingAuth(false);
     setAuthLaunched(false);
+    setAuthFlowResult(null);
     setIsVerifying(false);
     setVerificationStatus(null);
     setShowCancelConfirm(false);
@@ -206,7 +209,8 @@ export const AccountWizardModal: React.FC<Props> = ({
     try {
       setIsLaunchingAuth(true);
       setError(null);
-      await startLoginFlow(createdAccount.id);
+      const res = await startLoginFlow(createdAccount.id);
+      setAuthFlowResult(res);
       setAuthLaunched(true);
     } catch (err: any) {
       setError(err?.message || String(err));
@@ -599,6 +603,15 @@ export const AccountWizardModal: React.FC<Props> = ({
                   )}
                   {authLaunched ? "Relaunch Official Login" : "Start Official Login"}
                 </button>
+
+                {authLaunched && (
+                  <div className="alert alert-info" style={{ fontSize: 12, lineHeight: 1.4 }}>
+                    <strong>{authFlowResult?.message || "Official sign-in opened. Complete sign-in, then verify."}</strong>
+                    <div style={{ marginTop: 4, fontSize: 11 }}>
+                      Complete your sign-in inside the official application or terminal, then click the button below to verify your session.
+                    </div>
+                  </div>
+                )}
 
                 {authLaunched && (
                   <button

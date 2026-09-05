@@ -1,6 +1,6 @@
 [package]
 name = "ai-switcher"
-version = "0.1.0"
+version = "0.2.0"
 description = "AI Switcher - Multi-Account Environment Launcher"
 authors = ["AI Switcher Team"]
 edition = "2021"

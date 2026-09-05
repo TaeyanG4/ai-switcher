@@ -131,6 +131,111 @@ impl AccountStatus {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+pub enum AuthStatus {
+    Authenticated,
+    LoginRequired,
+    Pending,
+    Unknown,
+    Error,
+}
+
+impl Default for AuthStatus {
+    fn default() -> Self {
+        AuthStatus::Unknown
+    }
+}
+
+impl AuthStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            AuthStatus::Authenticated => "authenticated",
+            AuthStatus::LoginRequired => "login_required",
+            AuthStatus::Pending => "pending",
+            AuthStatus::Unknown => "unknown",
+            AuthStatus::Error => "error",
+        }
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "authenticated" | "ready" => AuthStatus::Authenticated,
+            "login_required" => AuthStatus::LoginRequired,
+            "pending" => AuthStatus::Pending,
+            "error" => AuthStatus::Error,
+            _ => AuthStatus::Unknown,
+        }
+    }
+
+    pub fn to_account_status(&self) -> AccountStatus {
+        match self {
+            AuthStatus::Authenticated => AccountStatus::Ready,
+            AuthStatus::LoginRequired => AccountStatus::LoginRequired,
+            AuthStatus::Pending => AccountStatus::Unknown,
+            AuthStatus::Unknown => AccountStatus::Unknown,
+            AuthStatus::Error => AccountStatus::Error,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RuntimeStatus {
+    Stopped,
+    Running,
+    Unknown,
+}
+
+impl Default for RuntimeStatus {
+    fn default() -> Self {
+        RuntimeStatus::Stopped
+    }
+}
+
+impl RuntimeStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            RuntimeStatus::Stopped => "stopped",
+            RuntimeStatus::Running => "running",
+            RuntimeStatus::Unknown => "unknown",
+        }
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "running" => RuntimeStatus::Running,
+            "stopped" => RuntimeStatus::Stopped,
+            _ => RuntimeStatus::Unknown,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthFlowStartResult {
+    pub platform: PlatformType,
+    pub flow_type: String,
+    pub process_started: bool,
+    pub helper_pid: Option<u32>,
+    pub verification_mode: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PendingAuthFlow {
+    pub account_id: String,
+    pub platform: PlatformType,
+    pub surface: ExecutionSurface,
+    pub profile_path: String,
+    pub custom_executable: Option<String>,
+    pub started_at: u64,
+    pub helper_pid: Option<u32>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum LaunchTarget {
     Default,
     Desktop,
@@ -226,6 +331,10 @@ pub struct AccountProfile {
     pub account_identifier: Option<String>,
     pub login_method: LoginMethod,
     pub status: AccountStatus,
+    #[serde(default)]
+    pub auth_status: AuthStatus,
+    #[serde(default)]
+    pub runtime_status: RuntimeStatus,
     pub profile_path: String,
     pub browser_profile_path: Option<String>,
     pub browser_profile_id: Option<String>,

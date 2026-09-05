@@ -211,9 +211,12 @@ export function App() {
 
   const handleLogin = async (account: AccountProfile) => {
     try {
-      showNotification(`Launching official login for "${account.displayName}"...`, "info");
-      await startLoginFlow(account.id);
-      showNotification(`Login process launched for "${account.displayName}".`, "success");
+      showNotification(`Opening official sign-in for "${account.displayName}"...`, "info");
+      const res = await startLoginFlow(account.id);
+      showNotification(
+        res.message || "Official sign-in opened. Complete sign-in, then verify.",
+        "info"
+      );
       await loadAccounts();
     } catch (err: any) {
       console.error("Login launch error:", err);
@@ -223,9 +226,15 @@ export function App() {
 
   const handleCheckStatus = async (account: AccountProfile) => {
     try {
-      showNotification(`Checking status for "${account.displayName}"...`, "info");
+      showNotification(`Verifying session for "${account.displayName}"...`, "info");
       const status = await checkAccountStatus(account.id);
-      showNotification(`"${account.displayName}" status: ${status}`, "info");
+      if (status === "ready") {
+        showNotification(`"${account.displayName}" is authenticated and ready!`, "success");
+      } else if (status === "login_required") {
+        showNotification(`"${account.displayName}": Sign-in required. Please complete sign-in and click Verify.`, "info");
+      } else {
+        showNotification(`"${account.displayName}" status: ${status}`, "info");
+      }
       await loadAccounts();
     } catch (err: any) {
       console.error("Status check error:", err);

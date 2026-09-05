@@ -1,4 +1,4 @@
-﻿# AI Switcher
+# AI Switcher
 
 <p align="center">
   <strong>Windows Multi-Account & Workspace Manager for OpenAI Codex, Anthropic Claude, and Google Antigravity</strong>
@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Release-v0.1.0-blue.svg" alt="Release v0.1.0" />
+  <img src="https://img.shields.io/badge/Release-v0.2.0-blue.svg" alt="Release v0.2.0" />
   <img src="https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D6.svg" alt="Windows 10/11" />
   <img src="https://img.shields.io/badge/Framework-Tauri%202-FFC131.svg" alt="Tauri 2" />
   <img src="https://img.shields.io/badge/Rust-Backend-dea584.svg" alt="Rust" />
@@ -34,9 +34,9 @@ Built **Desktop-First**, AI Switcher eliminates the friction of session collisio
 ## ✨ Key Capabilities
 
 ### 🖥️ Desktop-First Isolated Execution
-- **Google Antigravity Desktop:** Launches isolated Antigravity profiles with independent Chromium and `.gemini` user directories via custom `--user-data-dir`, `USERPROFILE`, and `APPDATA` overrides. Verified multi-instance support with CWD-only workspace activation.
-- **Anthropic Claude Desktop:** Launches native Claude Desktop directly into **Claude Code** (`claude://code/new?folder=...`) using isolated `--user-data-dir` profiles. Supports multiple concurrent desktop instances.
-- **OpenAI Codex Desktop & CLI:** Manages single-instance desktop workspace sessions alongside fully isolated multi-instance CLI environments using distinct `CODEX_HOME` profile directories.
+- **Google Antigravity Desktop:** Launches isolated Antigravity profiles with independent Chromium and `.gemini` user directories via custom `--user-data-dir`, `USERPROFILE`, and `APPDATA` overrides. OAuth deep links are seamlessly routed into the isolated profile via the Protocol Broker.
+- **Anthropic Claude Desktop:** Launches native Claude Desktop directly into **Claude Code** (`claude://code/new?folder=...`) using isolated `--user-data-dir` profiles with active session validation (`sessionKey`). Supports multiple concurrent desktop instances.
+- **OpenAI Codex CLI & Desktop:** Features fully isolated multi-account environments on the CLI surface using distinct `CODEX_HOME` profile directories (`[Open Codex CLI]`). Codex Desktop uses a shared Windows session and is cleanly accessible via `Open Codex Desktop (Shared Session)` with clear user confirmation.
 
 ### 📁 Workspace Presets
 - Save repositories with preferred account mappings for 1-click launching (`Open in Codex`, `Open in Claude`, `Open in Antigravity`).
@@ -97,9 +97,9 @@ Summon or hide AI Switcher from anywhere in Windows with a configurable global s
 
 ## 📦 Installation & Download
 
-Pre-compiled Windows installers are available on the [Releases Page](https://github.com/TaeyanG4/ai-switcher/releases/tag/v0.1.0).
+Pre-compiled Windows installers are available on the [Releases Page](https://github.com/TaeyanG4/ai-switcher/releases/tag/v0.2.0).
 
-1. Download **`AI Switcher_0.1.0_x64-setup.exe`**.
+1. Download **`AI Switcher_0.2.0_x64-setup.exe`**.
 2. Run the installer (installs to `%LOCALAPPDATA%\AI Switcher` without requiring Administrator privileges).
 3. Launch **AI Switcher** from your Start Menu or Desktop.
 

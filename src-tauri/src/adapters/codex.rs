@@ -87,7 +87,7 @@ impl PlatformAdapter for CodexAdapter {
     }
 
     fn default_surface(&self) -> ExecutionSurface {
-        ExecutionSurface::DesktopApp
+        ExecutionSurface::Cli
     }
 
     fn detect_executable(&self) -> Result<PathBuf> {
@@ -221,14 +221,7 @@ model = "o3"
         }
 
         match target {
-            LaunchTarget::Cli => Ok(LaunchSpec {
-                executable: exec,
-                arguments: vec![],
-                environment: env,
-                working_directory: workdir,
-                is_terminal: true,
-            }),
-            _ => {
+            LaunchTarget::Desktop => {
                 let path_arg = workdir.to_string_lossy().to_string();
                 Ok(LaunchSpec {
                     executable: exec,
@@ -238,6 +231,13 @@ model = "o3"
                     is_terminal: false,
                 })
             }
+            _ => Ok(LaunchSpec {
+                executable: exec,
+                arguments: vec![],
+                environment: env,
+                working_directory: workdir,
+                is_terminal: true,
+            }),
         }
     }
 

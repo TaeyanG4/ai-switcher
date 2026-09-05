@@ -1,6 +1,7 @@
 use ai_switcher_lib::db::Db;
 use ai_switcher_lib::models::{
-    AccountProfile, AccountStatus, AppSettings, LoginMethod, PlatformType, WorkspacePreset,
+    AccountProfile, AccountStatus, AppSettings, AuthStatus, LoginMethod, PlatformType,
+    RuntimeStatus, WorkspacePreset,
 };
 use std::collections::HashMap;
 
@@ -60,6 +61,8 @@ fn test_favorites_management_and_cascades() {
         account_identifier: None,
         login_method: LoginMethod::Google,
         status: AccountStatus::Ready,
+        auth_status: AuthStatus::Authenticated,
+        runtime_status: RuntimeStatus::Stopped,
         profile_path: "C:\\profiles\\tray1".to_string(),
         browser_profile_path: None,
         browser_profile_id: None,
@@ -79,6 +82,8 @@ fn test_favorites_management_and_cascades() {
         account_identifier: None,
         login_method: LoginMethod::Google,
         status: AccountStatus::Ready,
+        auth_status: AuthStatus::Authenticated,
+        runtime_status: RuntimeStatus::Stopped,
         profile_path: "C:\\profiles\\tray2".to_string(),
         browser_profile_path: None,
         browser_profile_id: None,
@@ -154,6 +159,8 @@ fn test_recents_aggregation_and_ordering() {
         account_identifier: Some("claude@dev.com".to_string()),
         login_method: LoginMethod::Google,
         status: AccountStatus::Ready,
+        auth_status: AuthStatus::Authenticated,
+        runtime_status: RuntimeStatus::Stopped,
         profile_path: "C:\\profiles\\claude-rec".to_string(),
         browser_profile_path: None,
         browser_profile_id: None,

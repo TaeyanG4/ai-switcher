@@ -213,45 +213,76 @@ impl PlatformAdapter for ClaudeAdapter {
     }
 
     async fn check_status(&self, profile: &AccountProfile) -> Result<AccountStatus> {
-        let cli_dir = PathBuf::from(&profile.profile_path).join("cli");
-
-        let cli_exe = match self.detect_cli_executable() {
-            Ok(exe) => exe,
-            Err(_) => return Ok(AccountStatus::Ready),
-        };
-
-        let mut cmd = Command::new(cli_exe);
-        cmd.args(["auth", "status", "--json"]);
-        cmd.env("CLAUDE_CONFIG_DIR", &cli_dir);
-
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        let profile_dir = PathBuf::from(&profile.profile_path);
+        if !profile_dir.exists() {
+            return Ok(AccountStatus::LoginRequired);
         }
 
-        let output = match cmd.output() {
-            Ok(out) => out,
-            Err(_) => return Ok(AccountStatus::Unknown),
-        };
+        // 1. Check Desktop session via Network/Cookies SQLite database
+        let candidate_cookie_paths = [
+            profile_dir.join("desktop").join("Network").join("Cookies"),
+            profile_dir.join("desktop").join("Cookies"),
+        ];
 
-        if let Ok(stdout) = String::from_utf8(output.stdout) {
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&stdout) {
-                if let Some(logged_in) = json.get("loggedIn").and_then(|v| v.as_bool()) {
-                    if logged_in {
-                        return Ok(AccountStatus::Ready);
-                    } else {
-                        return Ok(AccountStatus::LoginRequired);
+        for cookie_path in &candidate_cookie_paths {
+            if cookie_path.exists() {
+                if let Ok(conn) = rusqlite::Connection::open_with_flags(
+                    cookie_path,
+                    rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
+                        | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+                ) {
+                    let _ = conn.execute("PRAGMA query_only = ON;", []);
+                    let count: rusqlite::Result<i64> = conn.query_row(
+                        "SELECT COUNT(*) FROM cookies WHERE host_key LIKE '%claude.ai%' AND name = 'sessionKey'",
+                        [],
+                        |r| r.get(0),
+                    );
+                    if let Ok(c) = count {
+                        if c > 0 {
+                            return Ok(AccountStatus::Ready);
+                        }
                     }
                 }
             }
         }
 
-        if output.status.success() {
-            Ok(AccountStatus::Ready)
-        } else {
-            Ok(AccountStatus::LoginRequired)
+        // If desktop is installed, Desktop verification ONLY probes Desktop session!
+        if self.is_desktop_installed() {
+            return Ok(AccountStatus::LoginRequired);
         }
+
+        // 2. Check CLI session if Desktop is not installed and CLI is installed
+        if let Ok(cli_exe) = self.detect_cli_executable() {
+            let cli_dir = profile_dir.join("cli");
+            let mut cmd = Command::new(cli_exe);
+            cmd.args(["auth", "status", "--json"]);
+            cmd.env("CLAUDE_CONFIG_DIR", &cli_dir);
+
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+            }
+
+            if let Ok(output) = cmd.output() {
+                if let Ok(stdout) = String::from_utf8(output.stdout) {
+                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(&stdout) {
+                        if let Some(logged_in) = json.get("loggedIn").and_then(|v| v.as_bool()) {
+                            if logged_in {
+                                return Ok(AccountStatus::Ready);
+                            } else {
+                                return Ok(AccountStatus::LoginRequired);
+                            }
+                        }
+                    }
+                }
+                if output.status.success() {
+                    return Ok(AccountStatus::Ready);
+                }
+            }
+        }
+
+        Ok(AccountStatus::LoginRequired)
     }
 
     fn build_launch_spec(
@@ -373,11 +404,13 @@ impl PlatformAdapter for ClaudeAdapter {
             let _ = cmd.output();
         }
 
-        // Clean up desktop session cache files in isolated directory
+        // Clean up desktop session cache files and cookies in isolated directory
         let desktop_dir = PathBuf::from(&profile.profile_path).join("desktop");
         if desktop_dir.exists() {
             let _ = std::fs::remove_dir_all(desktop_dir.join("Session Storage"));
             let _ = std::fs::remove_dir_all(desktop_dir.join("Local Storage"));
+            let _ = std::fs::remove_file(desktop_dir.join("Network").join("Cookies"));
+            let _ = std::fs::remove_file(desktop_dir.join("Cookies"));
         }
 
         Ok(())

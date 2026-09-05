@@ -497,7 +497,7 @@ pub fn refresh_tray_menu(app: &AppHandle, state: &AppState) -> Result<(), tauri:
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{AccountStatus, LoginMethod};
+    use crate::models::{AccountStatus, AuthStatus, LoginMethod, RuntimeStatus};
     use std::collections::HashMap;
 
     fn make_test_account(
@@ -513,6 +513,8 @@ mod tests {
             account_identifier: None,
             login_method: LoginMethod::Google,
             status: AccountStatus::Ready,
+            auth_status: AuthStatus::Authenticated,
+            runtime_status: RuntimeStatus::Stopped,
             profile_path: format!("C:\\profiles\\{}", id),
             browser_profile_path: None,
             browser_profile_id: None,

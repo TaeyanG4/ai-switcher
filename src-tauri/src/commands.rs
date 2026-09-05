@@ -8,12 +8,12 @@ use crate::db::Db;
 use crate::error::Result;
 use crate::launcher::LauncherEngine;
 use crate::models::{
-    AccountHealthReport, AccountProfile, AccountStatus, AppSettings, BrowserProfile,
-    CreateAccountInput, CreateBrowserProfileInput, CreateWorkspaceInput, DiagnosticsInfo,
-    ExecutionSurface, FavoriteTarget, InstancePolicy, PlatformCapabilities, PlatformType,
-    ProcessConflictInfo, ProcessRecord, ProfileHealth, RecentItem, SupportBundle,
-    SystemHealthReport, UpdateAccountInput, UpdateBrowserProfileInput, UpdateWorkspaceInput,
-    WorkspacePreset,
+    AccountHealthReport, AccountProfile, AccountStatus, AppSettings, AuthFlowStartResult,
+    AuthStatus, BrowserProfile, CreateAccountInput, CreateBrowserProfileInput,
+    CreateWorkspaceInput, DiagnosticsInfo, ExecutionSurface, FavoriteTarget, InstancePolicy,
+    PlatformCapabilities, PlatformType, ProcessConflictInfo, ProcessRecord, ProfileHealth,
+    RecentItem, RuntimeStatus, SupportBundle, SystemHealthReport, UpdateAccountInput,
+    UpdateBrowserProfileInput, UpdateWorkspaceInput, WorkspacePreset,
 };
 
 pub struct AppState {
@@ -28,9 +28,9 @@ pub fn list_platform_capabilities_impl() -> Vec<PlatformCapabilities> {
         PlatformCapabilities {
             platform: PlatformType::Codex,
             display_name: "OpenAI Codex".to_string(),
-            description: "OpenAI's desktop agent & CLI assistant. CLI profiles support isolated environments; desktop application runs as a single instance.".to_string(),
-            primary_surface: ExecutionSurface::DesktopApp,
-            supported_surfaces: vec![ExecutionSurface::DesktopApp, ExecutionSurface::Cli],
+            description: "OpenAI's desktop agent & CLI assistant. Isolated CLI via CODEX_HOME; desktop application runs in a shared Windows session.".to_string(),
+            primary_surface: ExecutionSurface::Cli,
+            supported_surfaces: vec![ExecutionSurface::Cli, ExecutionSurface::DesktopApp],
             supports_desktop_isolation: false,
             isolation_summary: "CLI profiles are isolated via CODEX_HOME. Desktop application is single-instance and shares global Windows session.".to_string(),
             instance_policy: InstancePolicy::SingleInstance,
@@ -80,12 +80,34 @@ pub fn list_accounts(
     include_disabled: Option<bool>,
     state: State<AppState>,
 ) -> Result<Vec<AccountProfile>> {
-    state.db.list_accounts(include_disabled.unwrap_or(false))
+    let mut accounts = state.db.list_accounts(include_disabled.unwrap_or(false))?;
+    for account in &mut accounts {
+        if state
+            .launcher_engine
+            .process_manager
+            .has_running_process(&account.id)
+        {
+            account.runtime_status = RuntimeStatus::Running;
+        } else {
+            account.runtime_status = RuntimeStatus::Stopped;
+        }
+    }
+    Ok(accounts)
 }
 
 #[tauri::command]
 pub fn get_account(id: String, state: State<AppState>) -> Result<AccountProfile> {
-    state.db.get_account(&id)
+    let mut account = state.db.get_account(&id)?;
+    if state
+        .launcher_engine
+        .process_manager
+        .has_running_process(&account.id)
+    {
+        account.runtime_status = RuntimeStatus::Running;
+    } else {
+        account.runtime_status = RuntimeStatus::Stopped;
+    }
+    Ok(account)
 }
 
 pub fn create_account_impl(input: CreateAccountInput, state: &AppState) -> Result<AccountProfile> {
@@ -103,6 +125,14 @@ pub fn create_account_impl(input: CreateAccountInput, state: &AppState) -> Resul
     adapter.initialize_profile(&profile_path)?;
     std::fs::create_dir_all(&browser_profile_path)?;
 
+    let initial_status = input.initial_status.unwrap_or(AccountStatus::LoginRequired);
+    let initial_auth = match initial_status {
+        AccountStatus::Ready => AuthStatus::Authenticated,
+        AccountStatus::LoginRequired => AuthStatus::LoginRequired,
+        AccountStatus::Error => AuthStatus::Error,
+        _ => AuthStatus::Unknown,
+    };
+
     let account = AccountProfile {
         id: id.clone(),
         platform: input.platform,
@@ -111,7 +141,9 @@ pub fn create_account_impl(input: CreateAccountInput, state: &AppState) -> Resul
         login_method: input
             .login_method
             .unwrap_or(crate::models::LoginMethod::Unknown),
-        status: input.initial_status.unwrap_or(AccountStatus::LoginRequired),
+        status: initial_status,
+        auth_status: initial_auth,
+        runtime_status: RuntimeStatus::Stopped,
         profile_path: profile_path.to_string_lossy().to_string(),
         browser_profile_path: Some(browser_profile_path.to_string_lossy().to_string()),
         browser_profile_id: input.browser_profile_id,
@@ -216,7 +248,7 @@ pub fn cleanup_draft_account(id: String, state: State<AppState>) -> Result<()> {
     cleanup_draft_account_impl(&id, &state)
 }
 
-pub fn start_login_flow_impl(id: &str, state: &AppState) -> Result<ProcessRecord> {
+pub fn start_login_flow_impl(id: &str, state: &AppState) -> Result<AuthFlowStartResult> {
     let account = state.db.get_account(id)?;
     let adapter = get_adapter(account.platform);
     let spec = adapter.build_login_spec(&account)?;
@@ -248,20 +280,45 @@ pub fn start_login_flow_impl(id: &str, state: &AppState) -> Result<ProcessRecord
         }
     };
 
-    let _ = state.db.update_last_launched(&account.id);
-    let record = state.launcher_engine.process_manager.register_launch(
+    crate::protocol_broker::register_pending_auth(
         &account.id,
         account.platform,
         target_surface,
+        &account.profile_path,
+        account.custom_executable_path.as_deref(),
         Some(pid),
-        &spec.executable.to_string_lossy(),
     );
 
-    Ok(record)
+    let (flow_type, verification_mode, message) = match account.platform {
+        PlatformType::Codex => (
+            "cli_oauth".to_string(),
+            "cli_status".to_string(),
+            "Official sign-in opened in terminal. Complete sign-in, then click Verify.".to_string(),
+        ),
+        PlatformType::Claude => (
+            "electron_oauth".to_string(),
+            "cookies_sqlite".to_string(),
+            "Official sign-in opened. Complete sign-in in the Claude app, then click Verify.".to_string(),
+        ),
+        PlatformType::Antigravity => (
+            "electron_oauth".to_string(),
+            "oauth_creds_json".to_string(),
+            "Official sign-in opened. Complete browser authorization, return here and click Verify.".to_string(),
+        ),
+    };
+
+    Ok(AuthFlowStartResult {
+        platform: account.platform,
+        flow_type,
+        process_started: true,
+        helper_pid: Some(pid),
+        verification_mode,
+        message,
+    })
 }
 
 #[tauri::command]
-pub fn start_login_flow(id: String, state: State<AppState>) -> Result<ProcessRecord> {
+pub fn start_login_flow(id: String, state: State<AppState>) -> Result<AuthFlowStartResult> {
     start_login_flow_impl(&id, &state)
 }
 
@@ -270,7 +327,16 @@ pub async fn check_account_status(id: String, state: State<'_, AppState>) -> Res
     let account = state.db.get_account(&id)?;
     let adapter = get_adapter(account.platform);
     let status = adapter.check_status(&account).await?;
-    state.db.update_account_status(&id, status)?;
+    let auth_status = match status {
+        AccountStatus::Ready => AuthStatus::Authenticated,
+        AccountStatus::LoginRequired => AuthStatus::LoginRequired,
+        AccountStatus::Error => AuthStatus::Error,
+        _ => AuthStatus::Unknown,
+    };
+    state.db.update_account_auth_status(&id, auth_status)?;
+    if status == AccountStatus::Ready {
+        crate::protocol_broker::cleanup_pending_auth(Some(&id), None);
+    }
     Ok(status)
 }
 
@@ -329,9 +395,6 @@ pub fn launch_profile_impl(
                 let pid = state.browser_manager.launch(&bp, Some(target_url))?;
                 let _ = state.db.update_last_launched(&account.id);
                 let _ = state.db.update_browser_last_used(bp_id);
-                let _ = state
-                    .db
-                    .update_account_status(&account.id, AccountStatus::Running);
 
                 let record = state.launcher_engine.process_manager.register_launch(
                     &account.id,
@@ -352,9 +415,6 @@ pub fn launch_profile_impl(
             .launch(&account, adapter.as_ref(), surface, workspace_ref)?;
 
     let _ = state.db.update_last_launched(&account.id);
-    let _ = state
-        .db
-        .update_account_status(&account.id, AccountStatus::Running);
 
     Ok(record)
 }

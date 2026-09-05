@@ -49,7 +49,7 @@ fn test_platform_capabilities_truthfulness() {
         .find(|c| c.platform == PlatformType::Codex)
         .expect("Codex capabilities missing");
     assert_eq!(codex_cap.display_name, "OpenAI Codex");
-    assert_eq!(codex_cap.primary_surface, ExecutionSurface::DesktopApp);
+    assert_eq!(codex_cap.primary_surface, ExecutionSurface::Cli);
     assert!(codex_cap
         .supported_surfaces
         .contains(&ExecutionSurface::DesktopApp));

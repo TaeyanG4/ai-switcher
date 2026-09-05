@@ -6,6 +6,7 @@ pub mod error;
 pub mod fs_safety;
 pub mod launcher;
 pub mod models;
+pub mod protocol_broker;
 pub mod tray;
 
 use std::path::PathBuf;
@@ -29,6 +30,8 @@ use crate::launcher::{LauncherEngine, ProcessManager};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Restore any crashed protocol broker registrations on startup
+    crate::protocol_broker::restore_all_protocols();
     let app_dir = dirs::data_dir()
         .map(|p| p.join("AI-Switcher"))
         .unwrap_or_else(|| PathBuf::from("./data"));

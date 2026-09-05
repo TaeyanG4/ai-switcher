@@ -5,8 +5,8 @@ use uuid::Uuid;
 use ai_switcher_lib::adapters::claude::ClaudeAdapter;
 use ai_switcher_lib::adapters::PlatformAdapter;
 use ai_switcher_lib::models::{
-    AccountProfile, AccountStatus, ExecutionSurface, InstancePolicy, LaunchTarget, LoginMethod,
-    PlatformType,
+    AccountProfile, AccountStatus, AuthStatus, ExecutionSurface, InstancePolicy, LaunchTarget,
+    LoginMethod, PlatformType, RuntimeStatus,
 };
 
 struct TestDir {
@@ -43,6 +43,8 @@ fn create_test_profile(profile_path: &Path, display_name: &str) -> AccountProfil
         account_identifier: Some("test@anthropic.com".to_string()),
         login_method: LoginMethod::Google,
         status: AccountStatus::Ready,
+        auth_status: AuthStatus::Authenticated,
+        runtime_status: RuntimeStatus::Stopped,
         profile_path: profile_path.to_string_lossy().to_string(),
         browser_profile_path: None,
         browser_profile_id: None,
@@ -223,6 +225,65 @@ async fn test_claude_status_probing_isolated_unauthenticated() {
     let status = adapter.check_status(&profile).await;
     assert!(status.is_ok());
     let st = status.unwrap();
-    // Since there are no credentials in this fresh directory, status should be LoginRequired or Ready
-    assert!(st == AccountStatus::LoginRequired || st == AccountStatus::Ready);
+    assert_eq!(st, AccountStatus::LoginRequired);
+}
+
+#[tokio::test]
+async fn test_claude_status_probing_desktop_cookies() {
+    let temp = TestDir::new("cookies_test");
+    let adapter = ClaudeAdapter::new();
+    let profile = create_test_profile(temp.path(), "Cookie Test Account");
+
+    adapter.initialize_profile(temp.path()).unwrap();
+    let network_dir = temp.path().join("desktop").join("Network");
+    fs::create_dir_all(&network_dir).unwrap();
+    let cookie_db = network_dir.join("Cookies");
+
+    // 1. Create cookies DB with ONLY Cloudflare anonymous cookies (no sessionKey)
+    {
+        let conn = rusqlite::Connection::open(&cookie_db).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE cookies (
+                creation_utc INTEGER NOT NULL,
+                host_key TEXT NOT NULL,
+                top_frame_site_key TEXT NOT NULL,
+                name TEXT NOT NULL,
+                value TEXT NOT NULL,
+                encrypted_value BLOB NOT NULL,
+                path TEXT NOT NULL,
+                expires_utc INTEGER NOT NULL,
+                is_secure INTEGER NOT NULL,
+                is_httponly INTEGER NOT NULL,
+                last_access_utc INTEGER NOT NULL,
+                has_expires INTEGER NOT NULL,
+                is_persistent INTEGER NOT NULL,
+                priority INTEGER NOT NULL,
+                samesite INTEGER NOT NULL,
+                source_scheme INTEGER NOT NULL,
+                source_port INTEGER NOT NULL,
+                is_same_party INTEGER NOT NULL
+            );
+            INSERT INTO cookies (creation_utc, host_key, top_frame_site_key, name, value, encrypted_value, path, expires_utc, is_secure, is_httponly, last_access_utc, has_expires, is_persistent, priority, samesite, source_scheme, source_port, is_same_party)
+            VALUES (1, '.claude.ai', '', 'cf_clearance', 'cf_val', X'', '/', 0, 1, 1, 0, 0, 1, 1, 0, 2, 443, 0);
+            "
+        ).unwrap();
+    }
+
+    // Must be LoginRequired because sessionKey is absent
+    let status_anon = adapter.check_status(&profile).await.unwrap();
+    assert_eq!(status_anon, AccountStatus::LoginRequired);
+
+    // 2. Now insert sessionKey cookie
+    {
+        let conn = rusqlite::Connection::open(&cookie_db).unwrap();
+        conn.execute(
+            "INSERT INTO cookies (creation_utc, host_key, top_frame_site_key, name, value, encrypted_value, path, expires_utc, is_secure, is_httponly, last_access_utc, has_expires, is_persistent, priority, samesite, source_scheme, source_port, is_same_party)
+             VALUES (2, '.claude.ai', '', 'sessionKey', 'sk-ant-test', X'', '/', 0, 1, 1, 0, 0, 1, 1, 0, 2, 443, 0)",
+            [],
+        ).unwrap();
+    }
+
+    // Now it MUST return Ready
+    let status_auth = adapter.check_status(&profile).await.unwrap();
+    assert_eq!(status_auth, AccountStatus::Ready);
 }

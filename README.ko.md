@@ -1,4 +1,4 @@
-﻿# AI Switcher (한국어)
+# AI Switcher (한국어)
 
 <p align="center">
   <strong>OpenAI Codex, Anthropic Claude, Google Antigravity를 위한 Windows 멀티 계정 & 작업 영역 관리자</strong>
@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Release-v0.1.0-blue.svg" alt="Release v0.1.0" />
+  <img src="https://img.shields.io/badge/Release-v0.2.0-blue.svg" alt="Release v0.2.0" />
   <img src="https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D6.svg" alt="Windows 10/11" />
   <img src="https://img.shields.io/badge/Framework-Tauri%202-FFC131.svg" alt="Tauri 2" />
   <img src="https://img.shields.io/badge/Rust-Backend-dea584.svg" alt="Rust" />
@@ -34,9 +34,9 @@
 ## ✨ 핵심 기능
 
 ### 🖥️ 데스크톱 우선 독립 격리 실행
-- **Google Antigravity Desktop:** 독자적인 Chromium 및 `.gemini` 사용자 디렉터리를 구성하여 `--user-data-dir`, `USERPROFILE`, `APPDATA`를 완벽히 격리합니다. 작업 디렉터리(CWD) 검증 기반의 동시 다중 인스턴스 실행을 완벽 지원합니다.
-- **Anthropic Claude Desktop:** 분리된 `--user-data-dir` 프로필을 통해 네이티브 Claude Desktop 앱을 **Claude Code**(`claude://code/new?folder=...`) 세션으로 직접 실행합니다. 다중 인스턴스 동시 실행을 지원합니다.
-- **OpenAI Codex Desktop & CLI:** Windows 상의 단일 인스턴스 데스크톱 세션과 더불어, 전용 `CODEX_HOME` 격리 디렉터리를 통한 독립 다중 CLI 터미널 환경을 완벽 지원합니다.
+- **Google Antigravity Desktop:** 독자적인 Chromium 및 `.gemini` 사용자 디렉터리를 구성하여 `--user-data-dir`, `USERPROFILE`, `APPDATA`를 완벽히 격리합니다. 프로토콜 브로커를 통해 브라우저 OAuth 인증 콜백을 격리 인스턴스로 안전하게 중계합니다.
+- **Anthropic Claude Desktop:** 분리된 `--user-data-dir` 프로필을 통해 네이티브 Claude Desktop 앱을 **Claude Code**(`claude://code/new?folder=...`) 세션으로 직접 실행하며, 세션 쿠키(`sessionKey`) 기반으로 인증 상태를 정밀 검증합니다.
+- **OpenAI Codex CLI & Desktop:** 독립된 `CODEX_HOME` 프로필 디렉터리를 기반으로 CLI 환경(`[Codex CLI 열기]`)에서 완벽한 다중 계정 격리를 제공합니다. Codex 데스크톱은 Windows 공유 세션을 사용하므로 `Codex 데스크톱 열기 (공유 세션)`으로 명확히 안내됩니다.
 
 ### 📁 작업 영역 (Workspace) 프리셋
 - 자주 작업하는 프로젝트 폴더와 선호하는 플랫폼별 계정을 프리셋으로 저장하여 1클릭(`Codex로 열기`, `Claude로 열기`, `Antigravity로 열기`)으로 즉시 실행할 수 있습니다.
@@ -97,9 +97,9 @@ Windows 작업 중 언제 어디서나 단축키(기본값: `CommandOrControl+Al
 
 ## 📦 다운로드 및 설치 방법
 
-컴파일된 윈도우 설치 프로그램은 [Releases 페이지](https://github.com/TaeyanG4/ai-switcher/releases/tag/v0.1.0)에서 다운로드할 수 있습니다.
+컴파일된 윈도우 설치 프로그램은 [Releases 페이지](https://github.com/TaeyanG4/ai-switcher/releases/tag/v0.2.0)에서 다운로드할 수 있습니다.
 
-1. **`AI Switcher_0.1.0_x64-setup.exe`** 다운로드.
+1. **`AI Switcher_0.2.0_x64-setup.exe`** 다운로드.
 2. 설치 프로그램 실행 (관리자 권한 없이 `%LOCALAPPDATA%\AI Switcher`에 안전하게 설치됩니다).
 3. 시작 메뉴 또는 바탕화면에서 **AI Switcher** 실행.
 

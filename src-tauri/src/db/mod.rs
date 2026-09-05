@@ -5,9 +5,9 @@ use std::sync::{Arc, Mutex};
 
 use crate::error::{AppError, Result};
 use crate::models::{
-    AccountProfile, AccountStatus, AppSettings, BrowserKind, BrowserProfile, FavoriteTarget,
-    LoginMethod, PlatformType, RecentItem, UpdateAccountInput, UpdateBrowserProfileInput,
-    UpdateWorkspaceInput, WorkspacePreset,
+    AccountProfile, AccountStatus, AppSettings, AuthStatus, BrowserKind, BrowserProfile,
+    FavoriteTarget, LoginMethod, PlatformType, RecentItem, RuntimeStatus, UpdateAccountInput,
+    UpdateBrowserProfileInput, UpdateWorkspaceInput, WorkspacePreset,
 };
 
 #[derive(Clone)]
@@ -66,6 +66,58 @@ pub fn cleanup_old_backups(backup_dir: &Path, keep_count: usize) -> Result<()> {
         }
     }
     Ok(())
+}
+pub const ACCOUNT_SELECT_COLS: &str =
+    "id, platform, display_name, account_identifier, login_method, status, 
+                    profile_path, browser_profile_path, browser_profile_id, custom_executable_path, 
+                    launch_arguments, environment_variables, default_workspace_path, is_enabled, 
+                    last_launched_at, created_at, updated_at, auth_status";
+
+pub fn map_account_row(row: &rusqlite::Row) -> rusqlite::Result<AccountProfile> {
+    let platform_str: String = row.get(1)?;
+    let login_method_str: String = row.get(4)?;
+    let status_str: String = row.get(5)?;
+    let launch_args_json: String = row.get(10)?;
+    let env_vars_json: String = row.get(11)?;
+    let is_enabled_int: i32 = row.get(13)?;
+    let auth_status_str: Option<String> = row.get(17).ok();
+
+    let platform = PlatformType::from_str(&platform_str).unwrap_or(PlatformType::Codex);
+    let login_method = LoginMethod::from_str(&login_method_str);
+    let status = AccountStatus::from_str(&status_str);
+    let auth_status = auth_status_str
+        .map(|s| AuthStatus::from_str(&s))
+        .unwrap_or_else(|| match status {
+            AccountStatus::Ready => AuthStatus::Authenticated,
+            AccountStatus::LoginRequired => AuthStatus::LoginRequired,
+            _ => AuthStatus::Unknown,
+        });
+
+    let launch_arguments: Vec<String> = serde_json::from_str(&launch_args_json).unwrap_or_default();
+    let environment_variables: HashMap<String, String> =
+        serde_json::from_str(&env_vars_json).unwrap_or_default();
+
+    Ok(AccountProfile {
+        id: row.get(0)?,
+        platform,
+        display_name: row.get(2)?,
+        account_identifier: row.get(3)?,
+        login_method,
+        status,
+        auth_status,
+        runtime_status: RuntimeStatus::Stopped,
+        profile_path: row.get(6)?,
+        browser_profile_path: row.get(7)?,
+        browser_profile_id: row.get(8)?,
+        custom_executable_path: row.get(9)?,
+        launch_arguments,
+        environment_variables,
+        default_workspace_path: row.get(12)?,
+        is_enabled: is_enabled_int == 1,
+        last_launched_at: row.get(14)?,
+        created_at: row.get(15)?,
+        updated_at: row.get(16)?,
+    })
 }
 
 impl Db {
@@ -131,7 +183,7 @@ impl Db {
         }
 
         // Backup existing database before running new migrations
-        if user_version > 0 && user_version < 4 {
+        if user_version > 0 && user_version < 5 {
             let _ = backup_database_file(&db_path, &conn);
         }
 
@@ -263,6 +315,48 @@ impl Db {
             )?;
             tx.execute("PRAGMA user_version = 4", [])?;
             tx.commit()?;
+            user_version = 4;
+        }
+
+        // Migration 5: Separate auth_status column
+        if user_version < 5 {
+            let tx = conn.transaction()?;
+            let has_col = {
+                let mut stmt = tx.prepare("PRAGMA table_info(accounts)")?;
+                let columns = stmt
+                    .query_map([], |row| row.get::<_, String>(1))?
+                    .filter_map(|r| r.ok())
+                    .collect::<Vec<_>>();
+                columns.contains(&"auth_status".to_string())
+            };
+
+            if !has_col {
+                tx.execute(
+                    "ALTER TABLE accounts ADD COLUMN auth_status TEXT NOT NULL DEFAULT 'unknown'",
+                    [],
+                )?;
+                tx.execute(
+                    "UPDATE accounts SET auth_status = 'authenticated' WHERE status = 'ready'",
+                    [],
+                )?;
+                tx.execute(
+                    "UPDATE accounts SET auth_status = 'login_required' WHERE status = 'login_required'",
+                    [],
+                )?;
+                tx.execute(
+                    "UPDATE accounts SET auth_status = 'login_required', status = 'login_required' WHERE status = 'running'",
+                    [],
+                )?;
+                tx.execute(
+                    "UPDATE accounts SET auth_status = 'unknown' WHERE status NOT IN ('ready', 'login_required')",
+                    [],
+                )?;
+            }
+            tx.execute_batch(
+                "CREATE INDEX IF NOT EXISTS idx_accounts_auth_status ON accounts(auth_status);",
+            )?;
+            tx.execute("PRAGMA user_version = 5", [])?;
+            tx.commit()?;
         }
 
         Ok(Self {
@@ -348,56 +442,19 @@ impl Db {
     pub fn list_accounts(&self, include_disabled: bool) -> Result<Vec<AccountProfile>> {
         let conn = self.conn.lock().unwrap();
         let query = if include_disabled {
-            "SELECT id, platform, display_name, account_identifier, login_method, status, 
-                    profile_path, browser_profile_path, browser_profile_id, custom_executable_path, 
-                    launch_arguments, environment_variables, default_workspace_path, is_enabled, 
-                    last_launched_at, created_at, updated_at 
-             FROM accounts ORDER BY created_at ASC"
+            format!(
+                "SELECT {} FROM accounts ORDER BY created_at ASC",
+                ACCOUNT_SELECT_COLS
+            )
         } else {
-            "SELECT id, platform, display_name, account_identifier, login_method, status, 
-                    profile_path, browser_profile_path, browser_profile_id, custom_executable_path, 
-                    launch_arguments, environment_variables, default_workspace_path, is_enabled, 
-                    last_launched_at, created_at, updated_at 
-             FROM accounts WHERE is_enabled = 1 ORDER BY created_at ASC"
+            format!(
+                "SELECT {} FROM accounts WHERE is_enabled = 1 ORDER BY created_at ASC",
+                ACCOUNT_SELECT_COLS
+            )
         };
 
-        let mut stmt = conn.prepare(query)?;
-        let rows = stmt.query_map([], |row| {
-            let platform_str: String = row.get(1)?;
-            let login_method_str: String = row.get(4)?;
-            let status_str: String = row.get(5)?;
-            let launch_args_json: String = row.get(10)?;
-            let env_vars_json: String = row.get(11)?;
-            let is_enabled_int: i32 = row.get(13)?;
-
-            let platform = PlatformType::from_str(&platform_str).unwrap_or(PlatformType::Codex);
-            let login_method = LoginMethod::from_str(&login_method_str);
-            let status = AccountStatus::from_str(&status_str);
-            let launch_arguments: Vec<String> =
-                serde_json::from_str(&launch_args_json).unwrap_or_default();
-            let environment_variables: HashMap<String, String> =
-                serde_json::from_str(&env_vars_json).unwrap_or_default();
-
-            Ok(AccountProfile {
-                id: row.get(0)?,
-                platform,
-                display_name: row.get(2)?,
-                account_identifier: row.get(3)?,
-                login_method,
-                status,
-                profile_path: row.get(6)?,
-                browser_profile_path: row.get(7)?,
-                browser_profile_id: row.get(8)?,
-                custom_executable_path: row.get(9)?,
-                launch_arguments,
-                environment_variables,
-                default_workspace_path: row.get(12)?,
-                is_enabled: is_enabled_int == 1,
-                last_launched_at: row.get(14)?,
-                created_at: row.get(15)?,
-                updated_at: row.get(16)?,
-            })
-        })?;
+        let mut stmt = conn.prepare(&query)?;
+        let rows = stmt.query_map([], map_account_row)?;
 
         let mut list = Vec::new();
         for r in rows {
@@ -408,49 +465,10 @@ impl Db {
 
     pub fn get_account(&self, id: &str) -> Result<AccountProfile> {
         let conn = self.conn.lock().unwrap();
-        let query = "SELECT id, platform, display_name, account_identifier, login_method, status, 
-                            profile_path, browser_profile_path, browser_profile_id, custom_executable_path, 
-                            launch_arguments, environment_variables, default_workspace_path, is_enabled, 
-                            last_launched_at, created_at, updated_at 
-                     FROM accounts WHERE id = ?1";
+        let query = format!("SELECT {} FROM accounts WHERE id = ?1", ACCOUNT_SELECT_COLS);
 
-        let mut stmt = conn.prepare(query)?;
-        let mut rows = stmt.query_map(params![id], |row| {
-            let platform_str: String = row.get(1)?;
-            let login_method_str: String = row.get(4)?;
-            let status_str: String = row.get(5)?;
-            let launch_args_json: String = row.get(10)?;
-            let env_vars_json: String = row.get(11)?;
-            let is_enabled_int: i32 = row.get(13)?;
-
-            let platform = PlatformType::from_str(&platform_str).unwrap_or(PlatformType::Codex);
-            let login_method = LoginMethod::from_str(&login_method_str);
-            let status = AccountStatus::from_str(&status_str);
-            let launch_arguments: Vec<String> =
-                serde_json::from_str(&launch_args_json).unwrap_or_default();
-            let environment_variables: HashMap<String, String> =
-                serde_json::from_str(&env_vars_json).unwrap_or_default();
-
-            Ok(AccountProfile {
-                id: row.get(0)?,
-                platform,
-                display_name: row.get(2)?,
-                account_identifier: row.get(3)?,
-                login_method,
-                status,
-                profile_path: row.get(6)?,
-                browser_profile_path: row.get(7)?,
-                browser_profile_id: row.get(8)?,
-                custom_executable_path: row.get(9)?,
-                launch_arguments,
-                environment_variables,
-                default_workspace_path: row.get(12)?,
-                is_enabled: is_enabled_int == 1,
-                last_launched_at: row.get(14)?,
-                created_at: row.get(15)?,
-                updated_at: row.get(16)?,
-            })
-        })?;
+        let mut stmt = conn.prepare(&query)?;
+        let mut rows = stmt.query_map(params![id], map_account_row)?;
 
         if let Some(res) = rows.next() {
             Ok(res?)
@@ -474,8 +492,8 @@ impl Db {
                 id, platform, display_name, account_identifier, login_method, status,
                 profile_path, browser_profile_path, browser_profile_id, custom_executable_path, 
                 launch_arguments, environment_variables, default_workspace_path, is_enabled, 
-                last_launched_at, created_at, updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
+                last_launched_at, created_at, updated_at, auth_status
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
             params![
                 account.id,
                 account.platform.as_str(),
@@ -494,6 +512,7 @@ impl Db {
                 account.last_launched_at,
                 account.created_at,
                 account.updated_at,
+                account.auth_status.as_str(),
             ],
         )?;
 
@@ -553,13 +572,37 @@ impl Db {
         self.get_account(&input.id)
     }
 
+    pub fn update_account_auth_status(&self, id: &str, auth_status: AuthStatus) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let now = chrono::Utc::now().to_rfc3339();
+        let status = auth_status.to_account_status();
+        conn.execute(
+            "UPDATE accounts SET auth_status = ?1, status = ?2, updated_at = ?3 WHERE id = ?4",
+            params![auth_status.as_str(), status.as_str(), now, id],
+        )?;
+        Ok(())
+    }
+
     pub fn update_account_status(&self, id: &str, status: AccountStatus) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         let now = chrono::Utc::now().to_rfc3339();
-        conn.execute(
-            "UPDATE accounts SET status = ?1, updated_at = ?2 WHERE id = ?3",
-            params![status.as_str(), now, id],
-        )?;
+        let auth_status = match status {
+            AccountStatus::Ready => Some(AuthStatus::Authenticated),
+            AccountStatus::LoginRequired => Some(AuthStatus::LoginRequired),
+            AccountStatus::Error => Some(AuthStatus::Error),
+            _ => None,
+        };
+        if let Some(auth) = auth_status {
+            conn.execute(
+                "UPDATE accounts SET status = ?1, auth_status = ?2, updated_at = ?3 WHERE id = ?4",
+                params![status.as_str(), auth.as_str(), now, id],
+            )?;
+        } else {
+            conn.execute(
+                "UPDATE accounts SET status = ?1, updated_at = ?2 WHERE id = ?3",
+                params![status.as_str(), now, id],
+            )?;
+        }
         Ok(())
     }
 
@@ -743,49 +786,13 @@ impl Db {
         browser_profile_id: &str,
     ) -> Result<Vec<AccountProfile>> {
         let conn = self.conn.lock().unwrap();
-        let query = "SELECT id, platform, display_name, account_identifier, login_method, status, 
-                            profile_path, browser_profile_path, browser_profile_id, custom_executable_path, 
-                            launch_arguments, environment_variables, default_workspace_path, is_enabled, 
-                            last_launched_at, created_at, updated_at 
-                     FROM accounts WHERE browser_profile_id = ?1 ORDER BY created_at ASC";
+        let query = format!(
+            "SELECT {} FROM accounts WHERE browser_profile_id = ?1 ORDER BY created_at ASC",
+            ACCOUNT_SELECT_COLS
+        );
 
-        let mut stmt = conn.prepare(query)?;
-        let rows = stmt.query_map(params![browser_profile_id], |row| {
-            let platform_str: String = row.get(1)?;
-            let login_method_str: String = row.get(4)?;
-            let status_str: String = row.get(5)?;
-            let launch_args_json: String = row.get(10)?;
-            let env_vars_json: String = row.get(11)?;
-            let is_enabled_int: i32 = row.get(13)?;
-
-            let platform = PlatformType::from_str(&platform_str).unwrap_or(PlatformType::Codex);
-            let login_method = LoginMethod::from_str(&login_method_str);
-            let status = AccountStatus::from_str(&status_str);
-            let launch_arguments: Vec<String> =
-                serde_json::from_str(&launch_args_json).unwrap_or_default();
-            let environment_variables: HashMap<String, String> =
-                serde_json::from_str(&env_vars_json).unwrap_or_default();
-
-            Ok(AccountProfile {
-                id: row.get(0)?,
-                platform,
-                display_name: row.get(2)?,
-                account_identifier: row.get(3)?,
-                login_method,
-                status,
-                profile_path: row.get(6)?,
-                browser_profile_path: row.get(7)?,
-                browser_profile_id: row.get(8)?,
-                custom_executable_path: row.get(9)?,
-                launch_arguments,
-                environment_variables,
-                default_workspace_path: row.get(12)?,
-                is_enabled: is_enabled_int == 1,
-                last_launched_at: row.get(14)?,
-                created_at: row.get(15)?,
-                updated_at: row.get(16)?,
-            })
-        })?;
+        let mut stmt = conn.prepare(&query)?;
+        let rows = stmt.query_map(params![browser_profile_id], map_account_row)?;
 
         let mut list = Vec::new();
         for r in rows {
@@ -996,9 +1003,7 @@ impl Db {
         let global_shortcut = self
             .get_setting("global_shortcut")?
             .unwrap_or(default.global_shortcut);
-        let language = self
-            .get_setting("language")?
-            .unwrap_or(default.language);
+        let language = self.get_setting("language")?.unwrap_or(default.language);
 
         Ok(AppSettings {
             theme,
@@ -1237,7 +1242,9 @@ impl Db {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{AccountStatus, BrowserKind, LoginMethod, PlatformType};
+    use crate::models::{
+        AccountStatus, AuthStatus, BrowserKind, LoginMethod, PlatformType, RuntimeStatus,
+    };
 
     #[test]
     fn test_db_crud() {
@@ -1253,6 +1260,8 @@ mod tests {
             account_identifier: Some("test@example.com".to_string()),
             login_method: LoginMethod::Google,
             status: AccountStatus::Ready,
+            auth_status: AuthStatus::Authenticated,
+            runtime_status: RuntimeStatus::Stopped,
             profile_path: "C:\\profiles\\test-1".to_string(),
             browser_profile_path: None,
             browser_profile_id: None,
@@ -1326,6 +1335,8 @@ mod tests {
             account_identifier: None,
             login_method: LoginMethod::Google,
             status: AccountStatus::Ready,
+            auth_status: AuthStatus::Authenticated,
+            runtime_status: RuntimeStatus::Stopped,
             profile_path: "C:\\profiles\\claude-1".to_string(),
             browser_profile_path: None,
             browser_profile_id: Some("browser-1".to_string()),
@@ -1404,6 +1415,8 @@ mod tests {
             account_identifier: None,
             login_method: LoginMethod::Google,
             status: AccountStatus::Ready,
+            auth_status: AuthStatus::Authenticated,
+            runtime_status: RuntimeStatus::Stopped,
             profile_path: "C:\\profiles\\codex-1".to_string(),
             browser_profile_path: None,
             browser_profile_id: None,
@@ -1511,6 +1524,8 @@ mod tests {
             account_identifier: None,
             login_method: LoginMethod::Google,
             status: AccountStatus::Ready,
+            auth_status: AuthStatus::Authenticated,
+            runtime_status: RuntimeStatus::Stopped,
             profile_path: "C:\\profiles\\claude-fav".to_string(),
             browser_profile_path: None,
             browser_profile_id: None,
@@ -1595,6 +1610,8 @@ mod tests {
             account_identifier: Some("old@example.com".to_string()),
             login_method: LoginMethod::Google,
             status: AccountStatus::Ready,
+            auth_status: AuthStatus::Authenticated,
+            runtime_status: RuntimeStatus::Stopped,
             profile_path: "C:\\profiles\\ag-old".to_string(),
             browser_profile_path: None,
             browser_profile_id: None,
