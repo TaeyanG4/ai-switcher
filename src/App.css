@@ -289,6 +289,19 @@ body {
   text-transform: uppercase;
 }
 
+.shared-session-pill {
+  font-size: 10px;
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
 .account-meta {
   display: flex;
   align-items: center;
@@ -324,6 +337,7 @@ body {
 .status-ready { color: var(--status-ready); }
 .status-running { color: var(--status-running); }
 .status-login-required { color: var(--status-login); }
+.status-pending { color: var(--status-login); }
 .status-error { color: var(--status-error); }
 .status-unknown { color: var(--status-unknown); }
 

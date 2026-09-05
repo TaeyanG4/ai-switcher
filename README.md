@@ -36,7 +36,7 @@ Built **Desktop-First**, AI Switcher eliminates the friction of session collisio
 ### 🖥️ Desktop-First Isolated Execution
 - **Google Antigravity Desktop:** Launches isolated Antigravity profiles with independent Chromium and `.gemini` user directories via custom `--user-data-dir`, `USERPROFILE`, and `APPDATA` overrides. OAuth deep links are seamlessly routed into the isolated profile via the Protocol Broker.
 - **Anthropic Claude Desktop:** Launches native Claude Desktop directly into **Claude Code** (`claude://code/new?folder=...`) using isolated `--user-data-dir` profiles with active session validation (`sessionKey`). Supports multiple concurrent desktop instances.
-- **OpenAI Codex CLI & Desktop:** Features fully isolated multi-account environments on the CLI surface using distinct `CODEX_HOME` profile directories (`[Open Codex CLI]`). Codex Desktop uses a shared Windows session and is cleanly accessible via `Open Codex Desktop (Shared Session)` with clear user confirmation.
+- **OpenAI Codex Desktop & CLI:** Launches native Codex Desktop directly (`[Open Codex Desktop]`) with explicit transparency indicating that Codex Desktop operates in a single shared Windows session (`⚠️ Shared Windows Desktop session`). Fully isolated multi-account environments are supported on the CLI surface via distinct `CODEX_HOME` profile directories (`Open Codex CLI`), accessible via the card dropdown.
 
 ### 📁 Workspace Presets
 - Save repositories with preferred account mappings for 1-click launching (`Open in Codex`, `Open in Claude`, `Open in Antigravity`).

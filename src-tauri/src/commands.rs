@@ -28,11 +28,11 @@ pub fn list_platform_capabilities_impl() -> Vec<PlatformCapabilities> {
         PlatformCapabilities {
             platform: PlatformType::Codex,
             display_name: "OpenAI Codex".to_string(),
-            description: "OpenAI's desktop agent & CLI assistant. Isolated CLI via CODEX_HOME; desktop application runs in a shared Windows session.".to_string(),
-            primary_surface: ExecutionSurface::Cli,
-            supported_surfaces: vec![ExecutionSurface::Cli, ExecutionSurface::DesktopApp],
+            description: "OpenAI's desktop agent & CLI assistant. Desktop application runs in a shared Windows session; isolated CLI via CODEX_HOME.".to_string(),
+            primary_surface: ExecutionSurface::DesktopApp,
+            supported_surfaces: vec![ExecutionSurface::DesktopApp, ExecutionSurface::Cli],
             supports_desktop_isolation: false,
-            isolation_summary: "CLI profiles are isolated via CODEX_HOME. Desktop application is single-instance and shares global Windows session.".to_string(),
+            isolation_summary: "Desktop application runs in a single-instance shared Windows session (desktop isolation unsupported). CLI profiles are isolated via CODEX_HOME.".to_string(),
             instance_policy: InstancePolicy::SingleInstance,
             supports_automated_status_probe: true,
             supports_logout: true,
@@ -144,6 +144,7 @@ pub fn create_account_impl(input: CreateAccountInput, state: &AppState) -> Resul
         status: initial_status,
         auth_status: initial_auth,
         runtime_status: RuntimeStatus::Stopped,
+        auth_states: vec![],
         profile_path: profile_path.to_string_lossy().to_string(),
         browser_profile_path: Some(browser_profile_path.to_string_lossy().to_string()),
         browser_profile_id: input.browser_profile_id,
@@ -287,6 +288,19 @@ pub fn start_login_flow_impl(id: &str, state: &AppState) -> Result<AuthFlowStart
         &account.profile_path,
         account.custom_executable_path.as_deref(),
         Some(pid),
+    )
+    .map_err(crate::error::AppError::AuthError)?;
+
+    // Persist pending auth status in DB (Section 7)
+    let _ = state
+        .db
+        .update_account_auth_status(&account.id, AuthStatus::Pending);
+    let _ = state.db.set_account_surface_auth_state(
+        &account.id,
+        target_surface,
+        AuthStatus::Pending,
+        Some("official_login_initiated"),
+        None,
     );
 
     let (flow_type, verification_mode, message) = match account.platform {
@@ -323,21 +337,32 @@ pub fn start_login_flow(id: String, state: State<AppState>) -> Result<AuthFlowSt
 }
 
 #[tauri::command]
-pub async fn check_account_status(id: String, state: State<'_, AppState>) -> Result<AccountStatus> {
+pub async fn check_account_status(
+    id: String,
+    surface: Option<ExecutionSurface>,
+    state: State<'_, AppState>,
+) -> Result<AccountStatus> {
     let account = state.db.get_account(&id)?;
     let adapter = get_adapter(account.platform);
-    let status = adapter.check_status(&account).await?;
-    let auth_status = match status {
-        AccountStatus::Ready => AuthStatus::Authenticated,
-        AccountStatus::LoginRequired => AuthStatus::LoginRequired,
-        AccountStatus::Error => AuthStatus::Error,
-        _ => AuthStatus::Unknown,
-    };
+    let target_surface = surface.unwrap_or_else(|| adapter.default_surface());
+    let auth_status = adapter
+        .check_surface_auth_status(&account, target_surface)
+        .await?;
+    let account_status = auth_status.to_account_status();
+
     state.db.update_account_auth_status(&id, auth_status)?;
-    if status == AccountStatus::Ready {
+    let _ = state.db.set_account_surface_auth_state(
+        &id,
+        target_surface,
+        auth_status,
+        Some("official_probe"),
+        None,
+    );
+
+    if auth_status == AuthStatus::Authenticated {
         crate::protocol_broker::cleanup_pending_auth(Some(&id), None);
     }
-    Ok(status)
+    Ok(account_status)
 }
 
 #[tauri::command]
@@ -353,6 +378,7 @@ pub async fn logout_account(id: String, state: State<'_, AppState>) -> Result<Ac
 #[tauri::command]
 pub fn check_launch_conflict(
     account_id: String,
+    surface: Option<ExecutionSurface>,
     state: State<AppState>,
 ) -> Result<Option<ProcessConflictInfo>> {
     let account = state.db.get_account(&account_id)?;
@@ -361,7 +387,7 @@ pub fn check_launch_conflict(
 
     Ok(state
         .launcher_engine
-        .check_conflict(&account, adapter.as_ref(), &all_accounts))
+        .check_conflict(&account, adapter.as_ref(), &all_accounts, surface))
 }
 
 pub fn launch_profile_impl(
@@ -394,6 +420,9 @@ pub fn launch_profile_impl(
 
                 let pid = state.browser_manager.launch(&bp, Some(target_url))?;
                 let _ = state.db.update_last_launched(&account.id);
+                let _ = state
+                    .db
+                    .update_account_last_launched(&account.id, ExecutionSurface::Web);
                 let _ = state.db.update_browser_last_used(bp_id);
 
                 let record = state.launcher_engine.process_manager.register_launch(
@@ -415,6 +444,9 @@ pub fn launch_profile_impl(
             .launch(&account, adapter.as_ref(), surface, workspace_ref)?;
 
     let _ = state.db.update_last_launched(&account.id);
+    let _ = state
+        .db
+        .update_account_last_launched(&account.id, record.surface);
 
     Ok(record)
 }
@@ -747,9 +779,10 @@ pub fn launch_workspace_preset_impl(
         ));
     }
 
+    let effective_surface = surface.or(Some(ExecutionSurface::DesktopApp));
     let record = launch_profile_impl(
         &target_account.id,
-        surface,
+        effective_surface,
         Some(ws.directory_path.clone()),
         state,
     )?;

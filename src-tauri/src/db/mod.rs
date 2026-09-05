@@ -5,9 +5,10 @@ use std::sync::{Arc, Mutex};
 
 use crate::error::{AppError, Result};
 use crate::models::{
-    AccountProfile, AccountStatus, AppSettings, AuthStatus, BrowserKind, BrowserProfile,
-    FavoriteTarget, LoginMethod, PlatformType, RecentItem, RuntimeStatus, UpdateAccountInput,
-    UpdateBrowserProfileInput, UpdateWorkspaceInput, WorkspacePreset,
+    AccountAuthState, AccountProfile, AccountStatus, AppSettings, AuthStatus, BrowserKind,
+    BrowserProfile, ExecutionSurface, FavoriteTarget, LoginMethod, PlatformType, RecentItem,
+    RuntimeStatus, UpdateAccountInput, UpdateBrowserProfileInput, UpdateWorkspaceInput,
+    WorkspacePreset,
 };
 
 #[derive(Clone)]
@@ -106,6 +107,7 @@ pub fn map_account_row(row: &rusqlite::Row) -> rusqlite::Result<AccountProfile> 
         status,
         auth_status,
         runtime_status: RuntimeStatus::Stopped,
+        auth_states: Vec::new(),
         profile_path: row.get(6)?,
         browser_profile_path: row.get(7)?,
         browser_profile_id: row.get(8)?,
@@ -183,7 +185,7 @@ impl Db {
         }
 
         // Backup existing database before running new migrations
-        if user_version > 0 && user_version < 5 {
+        if user_version > 0 && user_version < 6 {
             let _ = backup_database_file(&db_path, &conn);
         }
 
@@ -357,6 +359,67 @@ impl Db {
             )?;
             tx.execute("PRAGMA user_version = 5", [])?;
             tx.commit()?;
+            user_version = 5;
+        }
+
+        // Migration 6: Surface-aware authentication states & last_launched_surface
+        if user_version < 6 {
+            let tx = conn.transaction()?;
+            tx.execute_batch(
+                "
+                CREATE TABLE IF NOT EXISTS account_auth_states (
+                    account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+                    surface TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    verification_method TEXT,
+                    verified_at TEXT,
+                    last_error TEXT,
+                    PRIMARY KEY (account_id, surface)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_account_auth_states_acc ON account_auth_states(account_id);
+                ",
+            )?;
+
+            let has_surface_col = {
+                let mut stmt = tx.prepare("PRAGMA table_info(accounts)")?;
+                let columns = stmt
+                    .query_map([], |row| row.get::<_, String>(1))?
+                    .filter_map(|r| r.ok())
+                    .collect::<Vec<_>>();
+                columns.contains(&"last_launched_surface".to_string())
+            };
+
+            if !has_surface_col {
+                tx.execute(
+                    "ALTER TABLE accounts ADD COLUMN last_launched_surface TEXT",
+                    [],
+                )?;
+            }
+
+            // Populate initial surface auth states:
+            // For Codex: old authenticated state was CLI auth only. Desktop auth remains unknown.
+            tx.execute(
+                "INSERT OR IGNORE INTO account_auth_states (account_id, surface, status, verification_method, verified_at)
+                 SELECT id, 'cli', auth_status, 'codex_cli_status', updated_at
+                 FROM accounts WHERE platform = 'codex'",
+                [],
+            )?;
+            tx.execute(
+                "INSERT OR IGNORE INTO account_auth_states (account_id, surface, status, verification_method, verified_at)
+                 SELECT id, 'desktop_app', 'unknown', 'desktop_isolation_unsupported', updated_at
+                 FROM accounts WHERE platform = 'codex'",
+                [],
+            )?;
+
+            // For Claude & Antigravity: reset false positive authenticated states from v5 to 'unknown'
+            tx.execute(
+                "UPDATE accounts SET auth_status = 'unknown', status = 'unknown' WHERE platform IN ('claude', 'antigravity') AND auth_status = 'authenticated'",
+                [],
+            )?;
+
+            tx.execute("PRAGMA user_version = 6", [])?;
+            tx.commit()?;
         }
 
         Ok(Self {
@@ -458,7 +521,9 @@ impl Db {
 
         let mut list = Vec::new();
         for r in rows {
-            list.push(r?);
+            let mut acc = r?;
+            acc.auth_states = Self::internal_get_auth_states(&conn, &acc.id)?;
+            list.push(acc);
         }
         Ok(list)
     }
@@ -471,13 +536,91 @@ impl Db {
         let mut rows = stmt.query_map(params![id], map_account_row)?;
 
         if let Some(res) = rows.next() {
-            Ok(res?)
+            let mut acc = res?;
+            acc.auth_states = Self::internal_get_auth_states(&conn, &acc.id)?;
+            Ok(acc)
         } else {
             Err(AppError::NotFound(format!(
                 "Account not found with ID: {}",
                 id
             )))
         }
+    }
+
+    fn internal_get_auth_states(
+        conn: &Connection,
+        account_id: &str,
+    ) -> Result<Vec<AccountAuthState>> {
+        let mut stmt = conn.prepare(
+            "SELECT account_id, surface, status, verification_method, verified_at, last_error
+             FROM account_auth_states WHERE account_id = ?1",
+        )?;
+        let rows = stmt.query_map(params![account_id], |row| {
+            let surface_str: String = row.get(1)?;
+            let status_str: String = row.get(2)?;
+            Ok(AccountAuthState {
+                account_id: row.get(0)?,
+                surface: ExecutionSurface::from_str(&surface_str)
+                    .unwrap_or(ExecutionSurface::DesktopApp),
+                status: AuthStatus::from_str(&status_str),
+                verification_method: row.get(3)?,
+                verified_at: row.get(4)?,
+                last_error: row.get(5)?,
+            })
+        })?;
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(r?);
+        }
+        Ok(list)
+    }
+
+    pub fn get_account_surface_auth_states(
+        &self,
+        account_id: &str,
+    ) -> Result<Vec<AccountAuthState>> {
+        let conn = self.conn.lock().unwrap();
+        Self::internal_get_auth_states(&conn, account_id)
+    }
+
+    pub fn set_account_surface_auth_state(
+        &self,
+        account_id: &str,
+        surface: ExecutionSurface,
+        status: AuthStatus,
+        verification_method: Option<&str>,
+        last_error: Option<&str>,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let now = chrono::Utc::now().to_rfc3339();
+        conn.execute(
+            "INSERT INTO account_auth_states (account_id, surface, status, verification_method, verified_at, last_error)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+             ON CONFLICT(account_id, surface) DO UPDATE SET
+                 status = excluded.status,
+                 verification_method = excluded.verification_method,
+                 verified_at = excluded.verified_at,
+                 last_error = excluded.last_error",
+            params![
+                account_id,
+                surface.as_str(),
+                status.as_str(),
+                verification_method,
+                now,
+                last_error,
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn update_account_last_launched(&self, id: &str, surface: ExecutionSurface) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let now = chrono::Utc::now().to_rfc3339();
+        conn.execute(
+            "UPDATE accounts SET last_launched_at = ?1, last_launched_surface = ?2 WHERE id = ?3",
+            params![now, surface.as_str(), id],
+        )?;
+        Ok(())
     }
 
     pub fn insert_account(&self, account: &AccountProfile) -> Result<()> {
@@ -1188,7 +1331,7 @@ impl Db {
     pub fn get_recent_launches(&self, limit: usize) -> Result<Vec<RecentItem>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt_acc = conn.prepare(
-            "SELECT id, platform, display_name, account_identifier, last_launched_at
+            "SELECT id, platform, display_name, account_identifier, last_launched_at, last_launched_surface
              FROM accounts
              WHERE last_launched_at IS NOT NULL AND is_enabled = 1
              ORDER BY last_launched_at DESC LIMIT ?1",
@@ -1197,12 +1340,15 @@ impl Db {
             let plat_str: String = row.get(1)?;
             let platform = PlatformType::from_str(&plat_str);
             let ident: Option<String> = row.get(3)?;
+            let surf_str: Option<String> = row.get(5).ok().flatten();
+            let surface = surf_str.and_then(|s| ExecutionSurface::from_str(&s));
             Ok(RecentItem {
                 id: row.get(0)?,
                 kind: "account".to_string(),
                 title: row.get(2)?,
                 subtitle: ident.unwrap_or(plat_str),
                 platform,
+                surface,
                 last_used_at: row.get(4)?,
             })
         })?;
@@ -1225,6 +1371,7 @@ impl Db {
                 title: row.get(1)?,
                 subtitle: row.get(2)?,
                 platform: None,
+                surface: None,
                 last_used_at: row.get(3)?,
             })
         })?;
@@ -1262,6 +1409,7 @@ mod tests {
             status: AccountStatus::Ready,
             auth_status: AuthStatus::Authenticated,
             runtime_status: RuntimeStatus::Stopped,
+            auth_states: vec![],
             profile_path: "C:\\profiles\\test-1".to_string(),
             browser_profile_path: None,
             browser_profile_id: None,
@@ -1337,6 +1485,7 @@ mod tests {
             status: AccountStatus::Ready,
             auth_status: AuthStatus::Authenticated,
             runtime_status: RuntimeStatus::Stopped,
+            auth_states: vec![],
             profile_path: "C:\\profiles\\claude-1".to_string(),
             browser_profile_path: None,
             browser_profile_id: Some("browser-1".to_string()),
@@ -1417,6 +1566,7 @@ mod tests {
             status: AccountStatus::Ready,
             auth_status: AuthStatus::Authenticated,
             runtime_status: RuntimeStatus::Stopped,
+            auth_states: vec![],
             profile_path: "C:\\profiles\\codex-1".to_string(),
             browser_profile_path: None,
             browser_profile_id: None,
@@ -1526,6 +1676,7 @@ mod tests {
             status: AccountStatus::Ready,
             auth_status: AuthStatus::Authenticated,
             runtime_status: RuntimeStatus::Stopped,
+            auth_states: vec![],
             profile_path: "C:\\profiles\\claude-fav".to_string(),
             browser_profile_path: None,
             browser_profile_id: None,
@@ -1612,6 +1763,7 @@ mod tests {
             status: AccountStatus::Ready,
             auth_status: AuthStatus::Authenticated,
             runtime_status: RuntimeStatus::Stopped,
+            auth_states: vec![],
             profile_path: "C:\\profiles\\ag-old".to_string(),
             browser_profile_path: None,
             browser_profile_id: None,

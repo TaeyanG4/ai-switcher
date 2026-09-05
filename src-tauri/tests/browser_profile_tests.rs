@@ -226,6 +226,7 @@ fn test_reference_safe_deletion_in_db() {
         status: AccountStatus::Ready,
         auth_status: AuthStatus::Authenticated,
         runtime_status: RuntimeStatus::Stopped,
+        auth_states: vec![],
         profile_path: temp
             .path()
             .join("claude")

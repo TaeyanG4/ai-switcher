@@ -241,8 +241,12 @@ fn test_cross_platform_non_conflict() {
 
     // Case 1: Codex running + Claude launch -> NO CONFLICT
     let claude_adapter = get_adapter(PlatformType::Claude);
-    let conflict_claude =
-        engine.check_conflict(&all_accounts[1], claude_adapter.as_ref(), &all_accounts);
+    let conflict_claude = engine.check_conflict(
+        &all_accounts[1],
+        claude_adapter.as_ref(),
+        &all_accounts,
+        None,
+    );
     assert!(
         conflict_claude.is_none(),
         "Launching Claude must NEVER conflict with running Codex!"
@@ -254,6 +258,7 @@ fn test_cross_platform_non_conflict() {
         &all_accounts[2],
         antigravity_adapter.as_ref(),
         &all_accounts,
+        None,
     );
     assert!(
         conflict_ag.is_none(),
@@ -273,14 +278,14 @@ fn test_same_platform_conflict_single_instance() {
     pm.register_launch(
         "codex-account-1",
         PlatformType::Codex,
-        ExecutionSurface::DesktopApp,
+        ExecutionSurface::Cli,
         Some(current_pid),
         "codex.exe",
     );
 
     let all_accounts = vec![
         make_account("codex-account-1", PlatformType::Codex, "Codex Personal 1"),
-        make_account("codex-account-2", PlatformType::Codex, "Codex Personal 2"),
+        make_account("codex-account-2", PlatformType::Codex, "Codex Work 2"),
     ];
 
     let codex_adapter = get_adapter(PlatformType::Codex);
@@ -290,7 +295,12 @@ fn test_same_platform_conflict_single_instance() {
     );
 
     // Attempt to launch Codex Account 2 -> Conflict detected!
-    let conflict = engine.check_conflict(&all_accounts[1], codex_adapter.as_ref(), &all_accounts);
+    let conflict = engine.check_conflict(
+        &all_accounts[1],
+        codex_adapter.as_ref(),
+        &all_accounts,
+        None,
+    );
     assert!(
         conflict.is_some(),
         "Same-platform SingleInstance must detect conflict!"
@@ -333,7 +343,12 @@ fn test_same_platform_multi_instance_no_conflict() {
     );
 
     // Attempt to launch Claude Account 2 -> MultiInstance permits concurrent execution!
-    let conflict = engine.check_conflict(&all_accounts[1], claude_adapter.as_ref(), &all_accounts);
+    let conflict = engine.check_conflict(
+        &all_accounts[1],
+        claude_adapter.as_ref(),
+        &all_accounts,
+        None,
+    );
     assert!(
         conflict.is_none(),
         "MultiInstance platform must allow concurrent execution without conflict!"
@@ -370,6 +385,7 @@ fn make_account(id: &str, platform: PlatformType, name: &str) -> AccountProfile 
         status: AccountStatus::Ready,
         auth_status: AuthStatus::Authenticated,
         runtime_status: RuntimeStatus::Stopped,
+        auth_states: vec![],
         profile_path: format!("C:\\profiles\\{}", id),
         browser_profile_path: None,
         browser_profile_id: None,

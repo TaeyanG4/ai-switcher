@@ -13,7 +13,7 @@ interface Props {
   onToggleEnabled: (account: AccountProfile) => void;
   onDelete: (account: AccountProfile) => void;
   onRename: (account: AccountProfile) => void;
-  onCheckStatus?: (account: AccountProfile) => void;
+  onCheckStatus?: (account: AccountProfile, surface?: ExecutionSurface) => void;
   onLogout?: (account: AccountProfile) => void;
   onLogin?: (account: AccountProfile) => void;
 }
@@ -38,14 +38,14 @@ export const AccountCard: React.FC<Props> = ({
     account.platform === "claude"
       ? t("account.launchDesktop")
       : account.platform === "codex"
-      ? "Open Codex CLI"
+      ? "Open Codex Desktop"
       : account.platform === "antigravity"
       ? t("account.launchDesktop")
       : t("action.launch");
 
   const defaultSurfaceTitle =
     account.platform === "codex"
-      ? `Open isolated Codex CLI session (${account.displayName})`
+      ? `Open Codex Desktop (${account.displayName}) - Shared Windows session`
       : account.platform === "antigravity"
       ? `Launch isolated Antigravity Desktop profile (${account.displayName})`
       : `Launch ${account.displayName}`;
@@ -74,6 +74,14 @@ export const AccountCard: React.FC<Props> = ({
           {account.accountIdentifier && (
             <span className="account-identifier">{account.accountIdentifier}</span>
           )}
+          {account.platform === "codex" && (
+            <span
+              className="shared-session-pill"
+              title="Codex Desktop shares a single Windows session across all profiles"
+            >
+              ⚠️ Shared Windows Desktop session
+            </span>
+          )}
           {!account.isEnabled && <span className="disabled-pill">{t("status.disabled")}</span>}
         </div>
         <div className="account-meta">
@@ -92,7 +100,7 @@ export const AccountCard: React.FC<Props> = ({
       </div>
 
       <div className="account-actions">
-        {account.status === "login_required" && onLogin && (
+        {account.authStatus === "login_required" && onLogin && (
           <button
             className="btn btn-secondary"
             onClick={() => onLogin(account)}
@@ -107,15 +115,11 @@ export const AccountCard: React.FC<Props> = ({
 
         <button
           className="btn btn-primary"
-          onClick={() => onOpen(account, account.platform === "codex" ? "cli" : undefined)}
+          onClick={() => onOpen(account, "desktop_app")}
           disabled={!account.isEnabled}
           title={defaultSurfaceTitle}
         >
-          {account.platform === "codex" ? (
-            <Terminal size={13} style={{ marginRight: 4 }} />
-          ) : (
-            <Play size={13} style={{ marginRight: 4 }} />
-          )}
+          <Play size={13} style={{ marginRight: 4 }} />
           {defaultSurfaceLabel}
         </button>
 
@@ -142,23 +146,47 @@ export const AccountCard: React.FC<Props> = ({
               <div className="menu-overlay" onClick={() => setShowMenu(false)} />
               <div className="dropdown-menu">
                 {account.platform === "codex" && (
-                  <button
-                    className="dropdown-item"
-                    onClick={() => {
-                      setShowMenu(false);
-                      if (
-                        window.confirm(
-                          "Codex Desktop runs in a single shared Windows session and does not support multi-profile isolation. Proceed to open shared desktop session?"
-                        )
-                      ) {
-                        onOpen(account, "desktop_app");
-                      }
-                    }}
-                    title="Open Codex Desktop (Shared Windows Session)"
-                  >
-                    <Play size={13} />
-                    Open Codex Desktop (Shared Session)
-                  </button>
+                  <>
+                    <button
+                      className="dropdown-item"
+                      onClick={() => {
+                        setShowMenu(false);
+                        onOpen(account, "cli");
+                      }}
+                      title="Open isolated Codex CLI session in external terminal"
+                    >
+                      <Terminal size={13} />
+                      Open Codex CLI
+                    </button>
+
+                    {onCheckStatus && (
+                      <>
+                        <button
+                          className="dropdown-item"
+                          onClick={() => {
+                            setShowMenu(false);
+                            onCheckStatus(account, "desktop_app");
+                          }}
+                          title="Check Codex Desktop session status"
+                        >
+                          <RotateCw size={13} />
+                          Check Desktop Session
+                        </button>
+
+                        <button
+                          className="dropdown-item"
+                          onClick={() => {
+                            setShowMenu(false);
+                            onCheckStatus(account, "cli");
+                          }}
+                          title="Check isolated Codex CLI auth status"
+                        >
+                          <RotateCw size={13} />
+                          Check CLI Session
+                        </button>
+                      </>
+                    )}
+                  </>
                 )}
 
                 {account.platform === "antigravity" && (
@@ -212,10 +240,38 @@ export const AccountCard: React.FC<Props> = ({
                       <Globe size={13} />
                       {t("account.launchWeb")}
                     </button>
+
+                    {onCheckStatus && (
+                      <>
+                        <button
+                          className="dropdown-item"
+                          onClick={() => {
+                            setShowMenu(false);
+                            onCheckStatus(account, "desktop_app");
+                          }}
+                          title="Check Claude Desktop session status"
+                        >
+                          <RotateCw size={13} />
+                          Check Desktop Session
+                        </button>
+
+                        <button
+                          className="dropdown-item"
+                          onClick={() => {
+                            setShowMenu(false);
+                            onCheckStatus(account, "cli");
+                          }}
+                          title="Check Claude CLI auth status"
+                        >
+                          <RotateCw size={13} />
+                          Check CLI Session
+                        </button>
+                      </>
+                    )}
                   </>
                 )}
 
-                {(account.platform === "codex" || account.platform === "claude") && (
+                {(account.platform === "codex" || account.platform === "claude" || account.platform === "antigravity") && (
                   <div className="dropdown-divider" />
                 )}
 
@@ -228,11 +284,11 @@ export const AccountCard: React.FC<Props> = ({
                     }}
                   >
                     <KeyRound size={13} />
-                    {account.status === "login_required" ? t("action.login") : "Re-authenticate"}
+                    {account.authStatus === "login_required" ? t("action.login") : "Re-authenticate"}
                   </button>
                 )}
 
-                {account.isEnabled && onCheckStatus && (
+                {account.isEnabled && onCheckStatus && account.platform !== "codex" && account.platform !== "claude" && (
                   <button
                     className="dropdown-item"
                     onClick={() => {

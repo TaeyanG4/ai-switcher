@@ -36,7 +36,7 @@
 ### 🖥️ 데스크톱 우선 독립 격리 실행
 - **Google Antigravity Desktop:** 독자적인 Chromium 및 `.gemini` 사용자 디렉터리를 구성하여 `--user-data-dir`, `USERPROFILE`, `APPDATA`를 완벽히 격리합니다. 프로토콜 브로커를 통해 브라우저 OAuth 인증 콜백을 격리 인스턴스로 안전하게 중계합니다.
 - **Anthropic Claude Desktop:** 분리된 `--user-data-dir` 프로필을 통해 네이티브 Claude Desktop 앱을 **Claude Code**(`claude://code/new?folder=...`) 세션으로 직접 실행하며, 세션 쿠키(`sessionKey`) 기반으로 인증 상태를 정밀 검증합니다.
-- **OpenAI Codex CLI & Desktop:** 독립된 `CODEX_HOME` 프로필 디렉터리를 기반으로 CLI 환경(`[Codex CLI 열기]`)에서 완벽한 다중 계정 격리를 제공합니다. Codex 데스크톱은 Windows 공유 세션을 사용하므로 `Codex 데스크톱 열기 (공유 세션)`으로 명확히 안내됩니다.
+- **OpenAI Codex Desktop & CLI:** 네이티브 Codex 데스크톱을 직접 실행(`[Codex 데스크톱 열기]`)하며, 데스크톱 앱이 단일 Windows 공유 세션을 사용함을 명확히 안내(`⚠️ Windows 데스크톱 공유 세션`)합니다. 독립된 `CODEX_HOME` 프로필 디렉터리를 기반으로 한 다중 계정 격리는 CLI 환경(`Codex CLI 열기`)을 통해 우측 메뉴에서 완벽하게 지원됩니다.
 
 ### 📁 작업 영역 (Workspace) 프리셋
 - 자주 작업하는 프로젝트 폴더와 선호하는 플랫폼별 계정을 프리셋으로 저장하여 1클릭(`Codex로 열기`, `Claude로 열기`, `Antigravity로 열기`)으로 즉시 실행할 수 있습니다.

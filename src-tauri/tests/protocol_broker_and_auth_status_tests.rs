@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Arc;
 use uuid::Uuid;
 
 use ai_switcher_lib::browser::BrowserProfileManager;
@@ -11,8 +12,12 @@ use ai_switcher_lib::models::{
     AccountStatus, AuthStatus, CreateAccountInput, ExecutionSurface, PlatformType, RuntimeStatus,
 };
 use ai_switcher_lib::protocol_broker::{
-    cleanup_pending_auth, list_pending_auth_flows, redact_url, register_pending_auth,
+    cleanup_pending_auth, clear_test_base_dir, clear_test_registry_backend, is_auth_callback_url,
+    list_pending_auth_flows, redact_url, register_pending_auth, restore_protocol,
+    set_test_base_dir, set_test_registry_backend, setup_protocol_broker, MockRegistryBackend,
 };
+
+static TEST_REGISTRY_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 struct TestFixture {
     temp_dir: PathBuf,
@@ -70,6 +75,12 @@ fn test_url_redaction_removes_sensitive_query_parameters() {
 
 #[test]
 fn test_protocol_broker_pending_auth_lifecycle() {
+    let _guard = TEST_REGISTRY_LOCK.lock().unwrap();
+    let temp_dir = std::env::temp_dir().join(format!("ai_switcher_lifecycle_{}", Uuid::new_v4()));
+    fs::create_dir_all(&temp_dir).unwrap();
+    set_test_base_dir(temp_dir.clone());
+    cleanup_pending_auth(None, None);
+
     let account_id = format!("test-acc-{}", Uuid::new_v4());
     let profile_path = format!("C:\\profiles\\{}", account_id);
 
@@ -81,7 +92,8 @@ fn test_protocol_broker_pending_auth_lifecycle() {
         &profile_path,
         None,
         Some(12345),
-    );
+    )
+    .expect("Register pending auth should succeed");
 
     let flows = list_pending_auth_flows();
     let flow = flows.iter().find(|f| f.account_id == account_id);
@@ -101,6 +113,8 @@ fn test_protocol_broker_pending_auth_lifecycle() {
         flows_after.iter().all(|f| f.account_id != account_id),
         "Cleaned up flow must not exist"
     );
+
+    let _ = fs::remove_dir_all(&temp_dir);
 }
 
 #[test]
@@ -164,7 +178,12 @@ fn test_auth_status_and_runtime_status_decoupling() {
 
 #[test]
 fn test_start_login_flow_returns_auth_flow_start_result() {
+    let _guard = TEST_REGISTRY_LOCK.lock().unwrap();
     let fixture = TestFixture::new();
+    let mock = Arc::new(MockRegistryBackend::new());
+    set_test_registry_backend(mock);
+    set_test_base_dir(fixture.temp_dir.clone());
+    cleanup_pending_auth(None, None);
 
     let input = CreateAccountInput {
         platform: PlatformType::Codex,
@@ -190,6 +209,10 @@ fn test_start_login_flow_returns_auth_flow_start_result() {
     assert_eq!(res.flow_type, "cli_oauth");
     assert!(res.process_started);
     assert!(res.message.contains("Official sign-in opened"));
+
+    cleanup_pending_auth(None, None);
+    clear_test_registry_backend();
+    clear_test_base_dir();
 }
 
 #[test]
@@ -244,22 +267,167 @@ fn test_v4_to_v5_migration_resets_stale_running_accounts() {
         .unwrap();
     }
 
-    // Run Db::init which executes Migration 5
+    // Run Db::init which executes Migration 5 and Migration 6
     let db = Db::init(&db_path).expect("Failed to run Db::init");
-    assert_eq!(db.get_schema_version().unwrap(), 5);
+    assert_eq!(db.get_schema_version().unwrap(), 6);
 
     let stale_acc = db.get_account("stale-1").unwrap();
     assert_eq!(stale_acc.status, AccountStatus::LoginRequired);
     assert_eq!(stale_acc.auth_status, AuthStatus::LoginRequired);
 
     let ready_acc = db.get_account("ready-1").unwrap();
-    assert_eq!(ready_acc.status, AccountStatus::Ready);
-    assert_eq!(ready_acc.auth_status, AuthStatus::Authenticated);
+    // In migration 6, Claude's false-positive ready status is reset to Unknown
+    assert_eq!(ready_acc.status, AccountStatus::Unknown);
+    assert_eq!(ready_acc.auth_status, AuthStatus::Unknown);
 
     let _ = fs::remove_dir_all(&temp_dir);
 }
 
+#[test]
+fn test_protocol_broker_mock_registry_isolation() {
+    let _guard = TEST_REGISTRY_LOCK.lock().unwrap();
+    let temp_dir = std::env::temp_dir().join(format!("ai_switcher_mock_reg_{}", Uuid::new_v4()));
+    fs::create_dir_all(&temp_dir).unwrap();
+    let mock = Arc::new(MockRegistryBackend::new());
+    mock.set("antigravity", "\"C:\\Original\\antigravity.exe\" \"%1\"");
+    set_test_registry_backend(mock.clone());
+    set_test_base_dir(temp_dir.clone());
+    cleanup_pending_auth(None, None);
+
+    // Setup protocol broker
+    let reg = setup_protocol_broker("antigravity").expect("Setup broker must succeed");
+    assert_eq!(
+        reg.original_command.as_deref(),
+        Some("\"C:\\Original\\antigravity.exe\" \"%1\"")
+    );
+    assert!(reg.broker_command.contains("--broker-protocol antigravity"));
+
+    // Verify mock registry received the broker command without OS side effects
+    let current_cmd = mock.get("antigravity").unwrap();
+    assert!(current_cmd.contains("--broker-protocol antigravity"));
+
+    // Restore protocol
+    restore_protocol("antigravity");
+    assert_eq!(
+        mock.get("antigravity").as_deref(),
+        Some("\"C:\\Original\\antigravity.exe\" \"%1\"")
+    );
+
+    cleanup_pending_auth(None, None);
+    clear_test_registry_backend();
+    clear_test_base_dir();
+    let _ = fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn test_protocol_broker_ownership_safety() {
+    let _guard = TEST_REGISTRY_LOCK.lock().unwrap();
+    let temp_dir = std::env::temp_dir().join(format!("ai_switcher_ownership_{}", Uuid::new_v4()));
+    fs::create_dir_all(&temp_dir).unwrap();
+    let mock = Arc::new(MockRegistryBackend::new());
+    mock.set("antigravity", "\"C:\\Original\\antigravity.exe\" \"%1\"");
+    set_test_registry_backend(mock.clone());
+    set_test_base_dir(temp_dir.clone());
+    cleanup_pending_auth(None, None);
+
+    let _reg = setup_protocol_broker("antigravity").expect("Setup broker must succeed");
+
+    // Simulate an external app/update modifying the registry command while broker was registered
+    mock.set(
+        "antigravity",
+        "\"C:\\Program Files\\ExternalTool.exe\" \"%1\"",
+    );
+
+    // Attempt to restore
+    restore_protocol("antigravity");
+
+    // Ownership check must abort restoration and preserve the external tool!
+    assert_eq!(
+        mock.get("antigravity").as_deref(),
+        Some("\"C:\\Program Files\\ExternalTool.exe\" \"%1\"")
+    );
+
+    cleanup_pending_auth(None, None);
+    clear_test_registry_backend();
+    clear_test_base_dir();
+    let _ = fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn test_is_auth_callback_url_filtering() {
+    // Auth callback URLs
+    assert!(is_auth_callback_url(
+        "antigravity://auth/callback?code=abc123xyz"
+    ));
+    assert!(is_auth_callback_url("antigravity://auth/return"));
+    assert!(is_auth_callback_url("antigravity://oauth?code=token123"));
+
+    // Non-auth callback deep links (must NOT be intercepted by auth broker)
+    assert!(!is_auth_callback_url(
+        "antigravity://workspace/open?folder=H:/dev"
+    ));
+    assert!(!is_auth_callback_url("antigravity://command/open"));
+    assert!(!is_auth_callback_url("claude://code/new"));
+    assert!(!is_auth_callback_url("vscode://file/path/to/file"));
+}
+
+#[test]
+fn test_single_pending_auth_conflict_rejection() {
+    let _guard = TEST_REGISTRY_LOCK.lock().unwrap();
+    let fixture = TestFixture::new();
+    let mock = Arc::new(MockRegistryBackend::new());
+    set_test_registry_backend(mock);
+    set_test_base_dir(fixture.temp_dir.clone());
+    cleanup_pending_auth(None, None);
+
+    let input1 = CreateAccountInput {
+        platform: PlatformType::Antigravity,
+        display_name: "Antigravity Profile 1".to_string(),
+        account_identifier: None,
+        login_method: None,
+        default_workspace_path: None,
+        custom_executable_path: None,
+        browser_profile_id: None,
+        initial_status: Some(AccountStatus::LoginRequired),
+    };
+    let acc1 = create_account_impl(input1, &fixture.state).expect("Create acc1 failed");
+
+    let input2 = CreateAccountInput {
+        platform: PlatformType::Antigravity,
+        display_name: "Antigravity Profile 2".to_string(),
+        account_identifier: None,
+        login_method: None,
+        default_workspace_path: None,
+        custom_executable_path: None,
+        browser_profile_id: None,
+        initial_status: Some(AccountStatus::LoginRequired),
+    };
+    let acc2 = create_account_impl(input2, &fixture.state).expect("Create acc2 failed");
+
+    // Start first login flow
+    let res1 = start_login_flow_impl(&acc1.id, &fixture.state);
+    assert!(res1.is_ok(), "First flow must succeed: {:?}", res1.err());
+
+    // Start second login flow for same platform concurrently -> MUST fail with conflict
+    let res2 = start_login_flow_impl(&acc2.id, &fixture.state);
+    assert!(res2.is_err(), "Concurrent flow must be rejected");
+    let err_msg = res2.err().unwrap().to_string();
+    assert!(
+        err_msg
+            .to_lowercase()
+            .contains("another antigravity sign-in is already in progress"),
+        "Unexpected error: {}",
+        err_msg
+    );
+
+    // Clean up
+    cleanup_pending_auth(None, None);
+    clear_test_registry_backend();
+    clear_test_base_dir();
+}
+
 #[tokio::test]
+#[ignore = "requires real Windows host profiles and credentials"]
 async fn test_host_accounts_auth_probing_real_environment() {
     let host_db_path = dirs::data_dir().map(|p| p.join("AI-Switcher").join("switcher.db"));
 

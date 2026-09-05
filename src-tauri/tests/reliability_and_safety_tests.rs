@@ -192,7 +192,7 @@ fn test_database_backup_and_retention() {
 fn test_database_integrity_and_schema_version() {
     let env = TestEnv::new();
     assert!(env.db.check_integrity().unwrap());
-    assert_eq!(env.db.get_schema_version().unwrap(), 5);
+    assert_eq!(env.db.get_schema_version().unwrap(), 6);
 }
 
 #[test]
@@ -257,16 +257,16 @@ fn test_database_migration_v1_to_v5() {
         .unwrap();
     }
 
-    // Now open via Db::init, which must run migrations up to v5
+    // Now open via Db::init, which must run migrations up to v6
     let upgraded_db = Db::init(&db_path).unwrap();
-    assert_eq!(upgraded_db.get_schema_version().unwrap(), 5);
+    assert_eq!(upgraded_db.get_schema_version().unwrap(), 6);
 
-    // Verify existing v1 data survived intact and auth_status was populated
+    // Verify existing v1 data survived intact and auth_status was reset to unknown in v6
     let acc = upgraded_db.get_account("acc-1").unwrap();
     assert_eq!(acc.display_name, "Claude V1");
     assert_eq!(acc.platform, PlatformType::Claude);
     assert_eq!(acc.browser_profile_id, None);
-    assert_eq!(acc.auth_status, AuthStatus::Authenticated);
+    assert_eq!(acc.auth_status, AuthStatus::Unknown);
 
     // Verify v2/v3/v4/v5 tables exist and work
     assert!(upgraded_db.list_favorites().is_ok());
@@ -295,6 +295,7 @@ fn test_profile_health_and_repair_structure() {
         status: AccountStatus::Ready,
         auth_status: AuthStatus::Authenticated,
         runtime_status: RuntimeStatus::Stopped,
+        auth_states: vec![],
         profile_path: profile_path.to_str().unwrap().to_string(),
         browser_profile_path: None,
         browser_profile_id: None,
@@ -461,5 +462,5 @@ fn test_support_bundle_is_sanitized() {
     assert!(!serialized.contains("password"));
     assert!(!serialized.contains("client_secret"));
     assert!(bundle.db_integrity_ok);
-    assert_eq!(bundle.schema_version, 5);
+    assert_eq!(bundle.schema_version, 6);
 }

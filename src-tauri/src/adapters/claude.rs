@@ -5,7 +5,8 @@ use std::process::Command;
 use crate::adapters::{LaunchSpec, PlatformAdapter};
 use crate::error::{AppError, Result};
 use crate::models::{
-    AccountProfile, AccountStatus, ExecutionSurface, InstancePolicy, LaunchTarget, PlatformType,
+    AccountProfile, AccountStatus, AuthStatus, ExecutionSurface, InstancePolicy, LaunchTarget,
+    PlatformType,
 };
 
 pub struct ClaudeAdapter;
@@ -213,76 +214,115 @@ impl PlatformAdapter for ClaudeAdapter {
     }
 
     async fn check_status(&self, profile: &AccountProfile) -> Result<AccountStatus> {
+        let auth = self
+            .check_surface_auth_status(profile, ExecutionSurface::DesktopApp)
+            .await?;
+        Ok(auth.to_account_status())
+    }
+
+    async fn check_surface_auth_status(
+        &self,
+        profile: &AccountProfile,
+        surface: ExecutionSurface,
+    ) -> Result<AuthStatus> {
         let profile_dir = PathBuf::from(&profile.profile_path);
         if !profile_dir.exists() {
-            return Ok(AccountStatus::LoginRequired);
+            return Ok(AuthStatus::LoginRequired);
         }
 
-        // 1. Check Desktop session via Network/Cookies SQLite database
-        let candidate_cookie_paths = [
-            profile_dir.join("desktop").join("Network").join("Cookies"),
-            profile_dir.join("desktop").join("Cookies"),
-        ];
+        match surface {
+            ExecutionSurface::DesktopApp => {
+                let candidate_cookie_paths = [
+                    profile_dir.join("desktop").join("Network").join("Cookies"),
+                    profile_dir.join("desktop").join("Cookies"),
+                ];
 
-        for cookie_path in &candidate_cookie_paths {
-            if cookie_path.exists() {
-                if let Ok(conn) = rusqlite::Connection::open_with_flags(
-                    cookie_path,
-                    rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
-                        | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
-                ) {
-                    let _ = conn.execute("PRAGMA query_only = ON;", []);
-                    let count: rusqlite::Result<i64> = conn.query_row(
-                        "SELECT COUNT(*) FROM cookies WHERE host_key LIKE '%claude.ai%' AND name = 'sessionKey'",
-                        [],
-                        |r| r.get(0),
-                    );
-                    if let Ok(c) = count {
-                        if c > 0 {
-                            return Ok(AccountStatus::Ready);
-                        }
-                    }
-                }
-            }
-        }
+                let mut any_cookie_file_found = false;
+                let mut db_error = false;
 
-        // If desktop is installed, Desktop verification ONLY probes Desktop session!
-        if self.is_desktop_installed() {
-            return Ok(AccountStatus::LoginRequired);
-        }
-
-        // 2. Check CLI session if Desktop is not installed and CLI is installed
-        if let Ok(cli_exe) = self.detect_cli_executable() {
-            let cli_dir = profile_dir.join("cli");
-            let mut cmd = Command::new(cli_exe);
-            cmd.args(["auth", "status", "--json"]);
-            cmd.env("CLAUDE_CONFIG_DIR", &cli_dir);
-
-            #[cfg(windows)]
-            {
-                use std::os::windows::process::CommandExt;
-                cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
-            }
-
-            if let Ok(output) = cmd.output() {
-                if let Ok(stdout) = String::from_utf8(output.stdout) {
-                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(&stdout) {
-                        if let Some(logged_in) = json.get("loggedIn").and_then(|v| v.as_bool()) {
-                            if logged_in {
-                                return Ok(AccountStatus::Ready);
-                            } else {
-                                return Ok(AccountStatus::LoginRequired);
+                for cookie_path in &candidate_cookie_paths {
+                    if cookie_path.exists() {
+                        any_cookie_file_found = true;
+                        match rusqlite::Connection::open_with_flags(
+                            cookie_path,
+                            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
+                                | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+                        ) {
+                            Ok(conn) => {
+                                let _ = conn.execute("PRAGMA query_only = ON;", []);
+                                let count_res: rusqlite::Result<i64> = conn.query_row(
+                                    "SELECT COUNT(*) FROM cookies WHERE host_key LIKE '%claude.ai%' AND name = 'sessionKey'",
+                                    [],
+                                    |r| r.get(0),
+                                );
+                                match count_res {
+                                    Ok(count) => {
+                                        if count > 0 {
+                                            return Ok(AuthStatus::Authenticated);
+                                        }
+                                    }
+                                    Err(_) => {
+                                        db_error = true;
+                                    }
+                                }
+                            }
+                            Err(_) => {
+                                db_error = true;
                             }
                         }
                     }
                 }
-                if output.status.success() {
-                    return Ok(AccountStatus::Ready);
+
+                if db_error {
+                    // DB locked by running Claude instance, permissions, or schema change
+                    return Ok(AuthStatus::Unknown);
+                }
+
+                if !any_cookie_file_found {
+                    return Ok(AuthStatus::LoginRequired);
+                }
+
+                Ok(AuthStatus::LoginRequired)
+            }
+            ExecutionSurface::Cli => {
+                if let Ok(cli_exe) = self.detect_cli_executable() {
+                    let cli_dir = profile_dir.join("cli");
+                    let mut cmd = Command::new(cli_exe);
+                    cmd.args(["auth", "status", "--json"]);
+                    cmd.env("CLAUDE_CONFIG_DIR", &cli_dir);
+
+                    #[cfg(windows)]
+                    {
+                        use std::os::windows::process::CommandExt;
+                        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+                    }
+
+                    if let Ok(output) = cmd.output() {
+                        if let Ok(stdout) = String::from_utf8(output.stdout) {
+                            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&stdout) {
+                                if let Some(logged_in) =
+                                    json.get("loggedIn").and_then(|v| v.as_bool())
+                                {
+                                    if logged_in {
+                                        return Ok(AuthStatus::Authenticated);
+                                    } else {
+                                        return Ok(AuthStatus::LoginRequired);
+                                    }
+                                }
+                            }
+                        }
+                        if output.status.success() {
+                            return Ok(AuthStatus::Authenticated);
+                        }
+                        return Ok(AuthStatus::LoginRequired);
+                    }
+                    Ok(AuthStatus::Unknown)
+                } else {
+                    Ok(AuthStatus::Unknown)
                 }
             }
+            ExecutionSurface::Web => Ok(AuthStatus::Unknown),
         }
-
-        Ok(AccountStatus::LoginRequired)
     }
 
     fn build_launch_spec(

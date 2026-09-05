@@ -32,8 +32,10 @@ impl LauncherEngine {
         target_account: &AccountProfile,
         adapter: &dyn PlatformAdapter,
         all_accounts: &[AccountProfile],
+        surface: Option<ExecutionSurface>,
     ) -> Option<ProcessConflictInfo> {
-        let policy = adapter.instance_policy();
+        let effective_surface = surface.unwrap_or_else(|| adapter.default_surface());
+        let policy = adapter.instance_policy_for(effective_surface);
         self.process_manager
             .check_platform_conflict(target_account, policy, all_accounts)
     }

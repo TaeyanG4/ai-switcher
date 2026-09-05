@@ -304,17 +304,13 @@ When third-party Electron applications (such as Antigravity) use Google OAuth vi
    - Windows default protocol associations run `Antigravity.exe "%1"` with host defaults (no `--user-data-dir`, default `%USERPROFILE%`).
    - This causes OAuth tokens to be written into the global host profile (`%USERPROFILE%\.gemini\oauth_creds.json`), leaving the isolated AI Switcher profile unauthenticated.
 
-2. **Headless Broker Mechanism:**
-   - During active login flows, AI Switcher hooks the HKCU protocol command:
-     `"C:\path\to\ai-switcher.exe" --broker-protocol <protocol> "%1"`
-   - The original protocol handler command is backed up to `%APPDATA%\AI-Switcher\protocol_backups\<protocol>.txt`.
-   - When the browser navigates to the callback URL:
-     - `ai-switcher.exe --broker-protocol` starts headlessly without launching the Tauri GUI window.
-     - Execution completes in < 10ms.
-     - The broker matches the incoming protocol against active `PendingAuthFlow` records in `%APPDATA%\AI-Switcher\pending_auth.json`.
-     - The target application is spawned with the isolated `--user-data-dir`, `USERPROFILE`, `HOME`, and `APPDATA`.
-     - The sensitive URL query string is automatically redacted in all logging outputs.
-   - On application startup or verification completion, `restore_all_protocols()` restores original registry handlers, guaranteeing zero system side-effects even after unexpected crashes.
+2. **Transactional Headless Broker Architecture:**
+   - **Protocol Registry Backend Abstraction:** Protocol interactions route through the `ProtocolRegistryBackend` trait, utilizing `WindowsRegistryBackend` in production and an isolated in-memory `MockRegistryBackend` during automated tests to guarantee zero real host registry mutation.
+   - **Ownership Safety:** AI Switcher records an ownership marker (`--broker-protocol`). Protocol restoration verifies the active registry handler: if an external application or updater modified the handler, restoration cleanly aborts and preserves the external handler.
+   - **Auth Callback Filter:** Deep links are validated via `is_auth_callback_url`. Only valid authentication callbacks (e.g., `antigravity://auth/...`) are intercepted. Normal platform deep links continue directly to the target application.
+   - **Single Active Pending Auth Guard:** Strictly prevents concurrent authentication flows on the same platform to eliminate race conditions and account token mismatch.
+   - **Atomic State Persistence:** `pending_auth.json` is saved via atomic write-and-rename patterns with mutex synchronization and automatic timeout expiration (15 minutes).
+   - **Immediate Restoration:** Protocol associations are restored immediately upon successful callback dispatch, cancellation, or flow cleanup.
 
 ---
 
@@ -322,7 +318,7 @@ When third-party Electron applications (such as Antigravity) use Google OAuth vi
 
 Persistence is handled locally using embedded SQLite via `rusqlite` with WAL mode enabled.
 
-### SQLite Schema (`v1` + `v2` migrations):
+### SQLite Schema (`v1` through `v6` migrations):
 
 ```sql
 CREATE TABLE IF NOT EXISTS accounts (
@@ -332,6 +328,8 @@ CREATE TABLE IF NOT EXISTS accounts (
     account_identifier TEXT,
     login_method TEXT NOT NULL,
     status TEXT NOT NULL,
+    auth_status TEXT NOT NULL DEFAULT 'unknown',
+    last_launched_surface TEXT,
     profile_path TEXT NOT NULL,
     browser_profile_path TEXT,
     browser_profile_id TEXT REFERENCES browser_profiles(id) ON DELETE SET NULL,
@@ -343,6 +341,16 @@ CREATE TABLE IF NOT EXISTS accounts (
     last_launched_at TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS account_auth_states (
+    account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    surface TEXT NOT NULL,
+    status TEXT NOT NULL,
+    verification_method TEXT,
+    verified_at TEXT,
+    last_error TEXT,
+    PRIMARY KEY (account_id, surface)
 );
 
 CREATE TABLE IF NOT EXISTS browser_profiles (
@@ -375,6 +383,8 @@ CREATE TABLE IF NOT EXISTS app_settings (
 
 CREATE INDEX IF NOT EXISTS idx_accounts_platform ON accounts(platform);
 CREATE INDEX IF NOT EXISTS idx_accounts_status ON accounts(status);
+CREATE INDEX IF NOT EXISTS idx_accounts_auth_status ON accounts(auth_status);
+CREATE INDEX IF NOT EXISTS idx_account_auth_states_account_id ON account_auth_states(account_id);
 ```
 
 ---
@@ -459,7 +469,7 @@ pub struct PlatformCapabilities {
     pub recommended_browser_profile: bool,
 }
 ```
-Crucially, OpenAI Codex explicitly reports `supports_desktop_isolation: false` and notes that Codex Desktop is single-instance sharing the global Windows session, with profile isolation supported on CLI only via `CODEX_HOME`.
+Crucially, OpenAI Codex explicitly reports `primary_surface: ExecutionSurface::DesktopApp` with `supports_desktop_isolation: false`, transparently indicating that Codex Desktop is single-instance and shares the global Windows session, while multi-account profile isolation is provided on the CLI surface via `CODEX_HOME`.
 
 ### 8.2 7-Step Registration Wizard Backend Flow
 1. **Platform Selection:** Fetches capabilities; renders surface badges and truthful capability warnings.

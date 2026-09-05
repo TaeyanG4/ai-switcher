@@ -45,6 +45,7 @@ fn create_test_profile(profile_path: &Path, display_name: &str) -> AccountProfil
         status: AccountStatus::Ready,
         auth_status: AuthStatus::Authenticated,
         runtime_status: RuntimeStatus::Stopped,
+        auth_states: vec![],
         profile_path: profile_path.to_string_lossy().to_string(),
         browser_profile_path: None,
         browser_profile_id: None,

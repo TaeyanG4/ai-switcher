@@ -5,7 +5,9 @@ use tauri::{AppHandle, Emitter, Manager, Wry};
 use crate::adapters::get_adapter;
 use crate::commands::{launch_profile_impl, launch_workspace_preset_impl, AppState};
 use crate::error::AppError;
-use crate::models::{AccountProfile, FavoriteTarget, PlatformType, RecentItem, WorkspacePreset};
+use crate::models::{
+    AccountProfile, ExecutionSurface, FavoriteTarget, PlatformType, RecentItem, WorkspacePreset,
+};
 
 // =========================================================================
 // Pure Tray Menu Model (Headless & Testable)
@@ -328,6 +330,7 @@ pub fn handle_tray_menu_id(app: &AppHandle, item_id: &str) {
                             &account,
                             adapter.as_ref(),
                             &all_accounts,
+                            Some(ExecutionSurface::DesktopApp),
                         ) {
                             // Restore window and show ConflictDialog!
                             restore_main_window(&app_handle);
@@ -344,7 +347,12 @@ pub fn handle_tray_menu_id(app: &AppHandle, item_id: &str) {
                         }
                     }
 
-                    match launch_profile_impl(&acc_id_owned, None, None, &state) {
+                    match launch_profile_impl(
+                        &acc_id_owned,
+                        Some(ExecutionSurface::DesktopApp),
+                        None,
+                        &state,
+                    ) {
                         Ok(_) => {
                             let _ = refresh_tray_menu(&app_handle, &state);
                         }
@@ -415,7 +423,18 @@ pub fn handle_tray_menu_id(app: &AppHandle, item_id: &str) {
             let app_handle = app.clone();
             tokio::spawn(async move {
                 if let Some(state) = app_handle.try_state::<AppState>() {
-                    let _ = launch_profile_impl(&acc_id, None, None, &state);
+                    let recent_surface = state
+                        .db
+                        .get_recent_launches(20)
+                        .ok()
+                        .and_then(|recents| {
+                            recents
+                                .into_iter()
+                                .find(|r| r.id == acc_id)
+                                .and_then(|r| r.surface)
+                        })
+                        .or(Some(ExecutionSurface::DesktopApp));
+                    let _ = launch_profile_impl(&acc_id, recent_surface, None, &state);
                     let _ = refresh_tray_menu(&app_handle, &state);
                 }
             });
@@ -515,6 +534,7 @@ mod tests {
             status: AccountStatus::Ready,
             auth_status: AuthStatus::Authenticated,
             runtime_status: RuntimeStatus::Stopped,
+            auth_states: vec![],
             profile_path: format!("C:\\profiles\\{}", id),
             browser_profile_path: None,
             browser_profile_id: None,
@@ -609,6 +629,7 @@ mod tests {
             title: "Personal".to_string(),
             subtitle: "claude".to_string(),
             platform: Some(PlatformType::Claude),
+            surface: None,
             last_used_at: "2026-09-05T10:00:00Z".to_string(),
         };
 

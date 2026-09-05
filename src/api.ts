@@ -70,16 +70,25 @@ export async function startLoginFlow(id: string): Promise<AuthFlowStartResult> {
   return await invoke<AuthFlowStartResult>("start_login_flow", { id });
 }
 
-export async function checkAccountStatus(id: string): Promise<AccountStatus> {
-  return await invoke<AccountStatus>("check_account_status", { id });
+export async function checkAccountStatus(
+  id: string,
+  surface?: ExecutionSurface
+): Promise<AccountStatus> {
+  return await invoke<AccountStatus>("check_account_status", { id, surface });
 }
 
 export async function logoutAccount(id: string): Promise<AccountStatus> {
   return await invoke<AccountStatus>("logout_account", { id });
 }
 
-export async function checkLaunchConflict(accountId: string): Promise<ProcessConflictInfo | null> {
-  return await invoke<ProcessConflictInfo | null>("check_launch_conflict", { accountId });
+export async function checkLaunchConflict(
+  accountId: string,
+  surface?: ExecutionSurface
+): Promise<ProcessConflictInfo | null> {
+  return await invoke<ProcessConflictInfo | null>("check_launch_conflict", {
+    accountId,
+    surface,
+  });
 }
 
 export async function launchProfile(

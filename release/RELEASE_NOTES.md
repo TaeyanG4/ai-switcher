@@ -1,8 +1,42 @@
-# AI Switcher v0.2.0 — Release Notes
+# AI Switcher — Release Notes
 
-**AI Switcher** is a native Windows desktop profile launcher and environment switcher for multi-account AI coding workflows across OpenAI Codex, Anthropic Claude, and Google Antigravity.
+## v0.2.1 — Release Notes
+
+> [!NOTE]
+> **Desktop-First Authentication Stabilization & Codex Fast Sequential Switching**
+> This release stabilizes desktop authentication routing, enforces Desktop-First as the primary product experience across all platforms, hardens protocol interception, and introduces verified Fast Sequential Desktop Account Switching for OpenAI Codex.
+
+### 🌟 Highlights
+- **Desktop-First Experience Restored as Primary:**
+  - **OpenAI Codex:** Primary card action is `[Open Codex Desktop]`. Displays a prominent `⚠️ Shared Windows Desktop session` transparency indicator. Fast sequential switching transitions between accounts via dedicated browser profiles in 2 clicks (~5.2s). CLI launch available in card overflow menu (`[⋮]`).
+  - **Anthropic Claude:** Primary card action is `[Open Claude Desktop]` with deep-link navigation into Claude Code. Supports multi-instance concurrent execution.
+  - **Google Antigravity:** Primary card action is `[Open Antigravity Desktop]` with isolated runtime environment. Supports multi-instance concurrent execution.
+  - Windows System Tray, Favorites, Recent Launches, and Workspace Presets default to Desktop execution surfaces.
+- **Codex Fast Sequential Desktop Account Switching:**
+  - Fast, assisted sequential account switching for OpenAI Codex Desktop on Windows without multi-instance collision.
+  - Graceful process-tree termination for background/minimized-to-tray `ChatGPT.exe` instances.
+  - Automated OAuth URL relay (<0.10s capture) to dedicated Chromium browser profiles.
+  - 1-click browser authorization redirects to official localhost loopback (`127.0.0.1:1455`), writing credentials natively via official `codex.exe`.
+  - Zero-secret compliance: strictly adheres to zero copying of `auth.json`, tokens, or cookies.
+- **Surface-Aware Concurrency Policy:**
+  - `instance_policy_for(surface)` distinguishes execution surfaces: Codex Desktop is `SingleInstance` while Codex CLI supports `MultiInstance` across distinct `CODEX_HOME` profiles.
+- **Protocol Broker Transactional Hardening:**
+  - `ProtocolRegistryBackend` trait abstraction enables complete test isolation via `MockRegistryBackend`, ensuring zero real HKCU mutations during `cargo test`.
+  - **Ownership Safety:** Only restores protocol handlers if current registry values match AI Switcher's broker marker. External handler updates are preserved.
+  - **Auth Callback Filtering:** Deep link interception is strictly restricted to auth callback URLs (`antigravity://auth/...`). General application links bypass directly.
+  - **Single Active Flow Guard:** Disallows concurrent login flows for the same platform, preventing callback token mismatch.
+  - **Resilient State Persistence:** Atomic temp-file-and-rename writes, mutex synchronization, and 15-minute expiration timeouts.
+- **Surface-Aware Authentication Model & Migration v6:**
+  - Adds `account_auth_states` table with composite key `(account_id, surface)` for fine-grained per-surface session tracking.
+  - Adds `last_launched_surface` to `accounts` table.
+  - Resets false-positive legacy ready states for Claude and Antigravity to `Unknown`.
+  - Decouples `AuthStatus` as the persistent truth, keeping `RuntimeStatus` in-memory.
+- **Zero Host Side-Effect Testing:**
+  - Full automated suite passes 100% with zero host registry or app data modifications.
 
 ---
+
+## v0.2.0 — Release Notes
 
 ## 🌟 Highlights
 

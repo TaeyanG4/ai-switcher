@@ -44,6 +44,24 @@ impl ExecutionSurface {
             ExecutionSurface::Web => "web",
         }
     }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "desktop_app" | "desktop" => Some(ExecutionSurface::DesktopApp),
+            "cli" => Some(ExecutionSurface::Cli),
+            "web" => Some(ExecutionSurface::Web),
+            _ => None,
+        }
+    }
+}
+
+impl std::str::FromStr for ExecutionSurface {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        ExecutionSurface::from_str(s).ok_or(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -129,20 +147,15 @@ impl AccountStatus {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum AuthStatus {
     Authenticated,
     LoginRequired,
     Pending,
+    #[default]
     Unknown,
     Error,
-}
-
-impl Default for AuthStatus {
-    fn default() -> Self {
-        AuthStatus::Unknown
-    }
 }
 
 impl AuthStatus {
@@ -178,18 +191,13 @@ impl AuthStatus {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum RuntimeStatus {
+    #[default]
     Stopped,
     Running,
     Unknown,
-}
-
-impl Default for RuntimeStatus {
-    fn default() -> Self {
-        RuntimeStatus::Stopped
-    }
 }
 
 impl RuntimeStatus {
@@ -324,6 +332,17 @@ pub struct DetectedBrowserInfo {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct AccountAuthState {
+    pub account_id: String,
+    pub surface: ExecutionSurface,
+    pub status: AuthStatus,
+    pub verification_method: Option<String>,
+    pub verified_at: Option<String>,
+    pub last_error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AccountProfile {
     pub id: String,
     pub platform: PlatformType,
@@ -335,6 +354,8 @@ pub struct AccountProfile {
     pub auth_status: AuthStatus,
     #[serde(default)]
     pub runtime_status: RuntimeStatus,
+    #[serde(default)]
+    pub auth_states: Vec<AccountAuthState>,
     pub profile_path: String,
     pub browser_profile_path: Option<String>,
     pub browser_profile_id: Option<String>,
@@ -513,6 +534,7 @@ pub struct RecentItem {
     pub title: String,
     pub subtitle: String,
     pub platform: Option<PlatformType>,
+    pub surface: Option<ExecutionSurface>,
     pub last_used_at: String,
 }
 

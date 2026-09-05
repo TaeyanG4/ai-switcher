@@ -73,6 +73,15 @@ export interface DetectedBrowserInfo {
   isAvailable: boolean;
 }
 
+export interface AccountAuthState {
+  accountId: string;
+  surface: ExecutionSurface;
+  status: AuthStatus;
+  verificationMethod?: string | null;
+  verifiedAt?: string | null;
+  lastError?: string | null;
+}
+
 export interface AccountProfile {
   id: string;
   platform: PlatformType;
@@ -82,6 +91,7 @@ export interface AccountProfile {
   status: AccountStatus;
   authStatus?: AuthStatus;
   runtimeStatus?: RuntimeStatus;
+  authStates?: AccountAuthState[];
   profilePath: string;
   browserProfilePath?: string | null;
   browserProfileId?: string | null;
@@ -220,6 +230,7 @@ export interface RecentItem {
   title: string;
   subtitle: string;
   platform?: PlatformType | null;
+  surface?: ExecutionSurface | null;
   lastUsedAt: string;
 }
 

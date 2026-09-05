@@ -430,3 +430,42 @@
   - Frontend production build compiles cleanly (`pnpm build`).
   - Verified real host accounts on Windows (`user1`–`user4` Codex authenticated, `user 5` Claude login_required, `user6` Antigravity login_required).
 
+---
+
+## Phase 13 — Desktop Authentication Stabilization Pass (v0.2.1)
+
+- [x] **13.1 Desktop-First Restoration**
+  - Restored `ExecutionSurface::DesktopApp` as the primary execution surface across all platforms: Codex (`[Open Codex Desktop]`), Claude (`[Open Claude Desktop]`), Antigravity (`[Open Antigravity Desktop]`).
+  - Added shared session transparency pill on Codex cards: `⚠️ Shared Windows Desktop session`.
+  - Moved CLI launches and session checks to secondary dropdown menu (`[⋮]`).
+  - Ensured Tray, Favorites, Recents, and Workspace Presets default to Desktop launches while faithfully capturing `last_launched_surface`.
+- [x] **13.2 Surface-Specific Instance Policy**
+  - Implemented `instance_policy_for(surface)`: Codex Desktop enforces `SingleInstance` while Codex CLI supports `MultiInstance`.
+- [x] **13.3 Protocol Broker Hardening & Ownership Safety**
+  - Introduced `ProtocolRegistryBackend` trait (`WindowsRegistryBackend` & `MockRegistryBackend`).
+  - Enforced ownership verification before protocol restoration: external registry modifications are never overwritten.
+  - Added URL validation via `is_auth_callback_url` (`antigravity://auth/...`), allowing normal links to bypass.
+  - Enforced single active pending authentication flow per platform to eliminate race conditions.
+  - Implemented atomic file writes, mutex synchronization, 15-minute expiration timeout, and centralized executable resolution.
+- [x] **13.4 Surface-Aware Authentication Model & Migration v6**
+  - Created `account_auth_states` table with primary key `(account_id, surface)`.
+  - Added `last_launched_surface` column to `accounts` table.
+  - Reset false positive ready states for Claude and Antigravity to `Unknown` upon migration.
+  - Decoupled `AuthStatus` as true source of truth, leaving `RuntimeStatus` completely independent.
+- [x] **13.5 Zero Test OS Side Effects**
+  - All unit and integration tests run against isolated mock registry and temporary directories (`TEST_BASE_DIR`).
+  - Ordinary `cargo test` guarantees zero mutations to HKCU registry, zero spawned external processes, and zero writes to `%APPDATA%\AI-Switcher`.
+  - Host E2E tests cleanly isolated behind `#[ignore]`.
+- [x] **13.6 Automated Quality Gates**
+  - `cargo fmt -- --check`: Passed (0 diffs).
+  - `cargo clippy --all-targets --all-features -- -D warnings`: Passed (0 warnings).
+  - `cargo test`: Passed 100% (90 passed, 0 failed, 1 ignored).
+  - `pnpm build`: Passed 100% (0 errors).
+
+**Phase 13 Acceptance Criteria:**
+- Primary product experience is Desktop-First across main UI, tray, favorites, recents, and workspaces. (Verified)
+- Codex Desktop shared session reality is clearly signaled; CLI isolation remains fully available. (Verified)
+- Protocol Broker is transactional, ownership-safe, and scoped to auth callbacks with zero test host mutations. (Verified)
+- Database schema supports per-surface auth tracking via Migration v6 with pre-migration backup. (Verified)
+- All automated quality gates pass cleanly with 0 errors, 0 warnings, and 0 diffs. (Verified)
+

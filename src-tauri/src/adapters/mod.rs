@@ -11,7 +11,8 @@ use std::path::{Path, PathBuf};
 
 use crate::error::Result;
 use crate::models::{
-    AccountProfile, AccountStatus, ExecutionSurface, InstancePolicy, LaunchTarget, PlatformType,
+    AccountProfile, AccountStatus, AuthStatus, ExecutionSurface, InstancePolicy, LaunchTarget,
+    PlatformType,
 };
 
 #[derive(Debug, Clone)]
@@ -28,11 +29,27 @@ pub trait PlatformAdapter: Send + Sync {
     fn platform(&self) -> PlatformType;
     fn display_name(&self) -> &'static str;
     fn instance_policy(&self) -> InstancePolicy;
+    fn instance_policy_for(&self, _surface: ExecutionSurface) -> InstancePolicy {
+        self.instance_policy()
+    }
     fn supported_surfaces(&self) -> Vec<ExecutionSurface>;
     fn default_surface(&self) -> ExecutionSurface;
     fn detect_executable(&self) -> Result<PathBuf>;
     fn initialize_profile(&self, profile_path: &Path) -> Result<()>;
     async fn check_status(&self, profile: &AccountProfile) -> Result<AccountStatus>;
+    async fn check_surface_auth_status(
+        &self,
+        profile: &AccountProfile,
+        _surface: ExecutionSurface,
+    ) -> Result<AuthStatus> {
+        let status = self.check_status(profile).await?;
+        Ok(match status {
+            AccountStatus::Ready => AuthStatus::Authenticated,
+            AccountStatus::LoginRequired => AuthStatus::LoginRequired,
+            AccountStatus::Error => AuthStatus::Error,
+            _ => AuthStatus::Unknown,
+        })
+    }
     fn build_launch_spec(
         &self,
         profile: &AccountProfile,

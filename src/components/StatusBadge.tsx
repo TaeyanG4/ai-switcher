@@ -11,11 +11,11 @@ interface Props {
 export const StatusBadge: React.FC<Props> = ({ status, authStatus, runtimeStatus }) => {
   const { t } = useI18n();
 
-  const effectiveAuth = authStatus ? (
-    authStatus === 'authenticated' ? 'ready' :
-    authStatus === 'login_required' ? 'login_required' :
-    authStatus === 'error' ? 'error' : 'unknown'
-  ) : (status || 'unknown');
+  const effectiveAuth: AuthStatus = authStatus || (
+    status === 'ready' ? 'authenticated' :
+    status === 'login_required' ? 'login_required' :
+    status === 'error' ? 'error' : 'unknown'
+  );
 
   const isRunning = runtimeStatus === 'running' || status === 'running';
 
@@ -26,7 +26,7 @@ export const StatusBadge: React.FC<Props> = ({ status, authStatus, runtimeStatus
           <span className="status-dot">▶</span> {t("status.running")}
         </span>
       )}
-      {effectiveAuth === "ready" && (
+      {effectiveAuth === "authenticated" && (
         <span className="status-badge status-ready" title={`Auth: ${t("status.ready")}`}>
           <span className="status-dot">●</span> {t("status.ready")}
         </span>
@@ -36,12 +36,17 @@ export const StatusBadge: React.FC<Props> = ({ status, authStatus, runtimeStatus
           <span className="status-dot">○</span> {t("status.loginRequired")}
         </span>
       )}
+      {effectiveAuth === "pending" && (
+        <span className="status-badge status-pending" title="Auth: Waiting for sign-in">
+          <span className="status-dot">◌</span> Waiting for sign-in
+        </span>
+      )}
       {effectiveAuth === "error" && (
         <span className="status-badge status-error" title={`Auth: ${t("status.error")}`}>
           <span className="status-dot">⚠</span> {t("status.error")}
         </span>
       )}
-      {effectiveAuth === "unknown" && !isRunning && (
+      {effectiveAuth === "unknown" && (
         <span className="status-badge status-unknown" title={`Auth: ${t("status.unknown")}`}>
           <span className="status-dot">?</span> {t("status.unknown")}
         </span>

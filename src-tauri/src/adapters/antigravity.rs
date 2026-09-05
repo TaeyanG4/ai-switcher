@@ -4,7 +4,8 @@ use std::path::{Path, PathBuf};
 use crate::adapters::{LaunchSpec, PlatformAdapter};
 use crate::error::{AppError, Result};
 use crate::models::{
-    AccountProfile, AccountStatus, ExecutionSurface, InstancePolicy, LaunchTarget, PlatformType,
+    AccountProfile, AccountStatus, AuthStatus, ExecutionSurface, InstancePolicy, LaunchTarget,
+    PlatformType,
 };
 
 pub struct AntigravityAdapter;
@@ -302,20 +303,36 @@ impl PlatformAdapter for AntigravityAdapter {
     /// In accordance with the security policy, we NEVER read or parse raw tokens.
     /// We check if `oauth_creds.json` exists and is non-empty within the profile's isolated .gemini folder.
     async fn check_status(&self, profile: &AccountProfile) -> Result<AccountStatus> {
-        let creds_file = PathBuf::from(&profile.profile_path)
-            .join("home")
-            .join(".gemini")
-            .join("oauth_creds.json");
+        let auth = self
+            .check_surface_auth_status(profile, ExecutionSurface::DesktopApp)
+            .await?;
+        Ok(auth.to_account_status())
+    }
 
-        if creds_file.exists() {
-            if let Ok(metadata) = std::fs::metadata(&creds_file) {
-                if metadata.len() > 0 {
-                    return Ok(AccountStatus::Ready);
+    async fn check_surface_auth_status(
+        &self,
+        profile: &AccountProfile,
+        surface: ExecutionSurface,
+    ) -> Result<AuthStatus> {
+        match surface {
+            ExecutionSurface::DesktopApp => {
+                let creds_file = PathBuf::from(&profile.profile_path)
+                    .join("home")
+                    .join(".gemini")
+                    .join("oauth_creds.json");
+
+                if creds_file.exists() {
+                    if let Ok(metadata) = std::fs::metadata(&creds_file) {
+                        if metadata.len() > 0 {
+                            return Ok(AuthStatus::Authenticated);
+                        }
+                    }
                 }
-            }
-        }
 
-        Ok(AccountStatus::LoginRequired)
+                Ok(AuthStatus::LoginRequired)
+            }
+            _ => Ok(AuthStatus::Unknown),
+        }
     }
 
     fn build_launch_spec(

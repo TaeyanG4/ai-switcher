@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { AccountProfile, ExecutionSurface, PlatformType } from "../types";
 import { AccountCard } from "./AccountCard";
 import { useI18n } from "../i18n/I18nContext";
@@ -14,7 +14,7 @@ interface Props {
   onToggleEnabled: (account: AccountProfile) => void;
   onDelete: (account: AccountProfile) => void;
   onRename: (account: AccountProfile) => void;
-  onCheckStatus?: (account: AccountProfile) => void;
+  onCheckStatus?: (account: AccountProfile, surface?: ExecutionSurface) => void;
   onLogout?: (account: AccountProfile) => void;
   onLogin?: (account: AccountProfile) => void;
 }

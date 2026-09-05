@@ -130,28 +130,31 @@ stateDiagram-v2
 
 ## 5. Platform Execution & Isolation Strategies
 
-### 5.1 OpenAI Codex
+### 5.1 OpenAI Codex (Desktop-First)
 - **Execution Surfaces:**
-  - **Codex CLI (External Terminal):** PRIMARY surface for multi-account isolation (`[Open Codex CLI]`).
-  - **Codex Desktop GUI:** Labeled `Open Codex Desktop (Shared Session)` with explicit warning dialog.
-- **Isolation Verification & Known Limitation:**
+  - **Codex Desktop GUI (PRIMARY):** Primary card button is `[Open Codex Desktop]`. Displays warning badge/pill: `⚠️ Shared Windows Desktop session`.
+  - **Codex CLI (External Terminal / SECONDARY):** Accessible via card dropdown menu `[⋮]` -> `Open Codex CLI`.
+- **Isolation Verification & Status Classifications:**
   - **Codex CLI Account Profile Isolation:** **VERIFIED**. Setting `CODEX_HOME = <profile_dir>` completely isolates credentials (`auth.json`), configuration (`config.toml`), and local SQLite databases (`state_5.sqlite`, `logs_2.sqlite`, `thread_history_1.sqlite`).
-  - **Codex Desktop Workspace Launch:** **VERIFIED**. Invoking `codex app [PATH]` reliably opens the target workspace root in the native Codex Desktop application.
-  - **Codex Desktop Account-Profile Isolation:** **UNSUPPORTED / UNVERIFIED**. Windows MSIX package (`OpenAI.Codex_...`) routes through Windows `RuntimeBroker.exe`, which runs in an isolated AppContainer and shares a single global Windows session. Therefore, Codex Desktop sessions cannot be isolated per profile.
-  - **Codex Desktop Concurrency:** **UNSUPPORTED**. Codex Desktop strictly enforces a single instance via Electron's `app.requestSingleInstanceLock()`.
+  - **Codex Desktop Workspace Launch:** **VERIFIED**. Invoking `codex app [PATH]` reliably launches the target workspace root in native Codex Desktop.
+  - **Codex Desktop Account Profile Isolation:** **BLOCKED**. Windows MSIX package (`OpenAI.Codex_...`) routes through Windows `RuntimeBroker.exe`, which executes in an AppContainer sandbox and shares a single global Windows session. Upstream Electron app does not provide an isolated `--user-data-dir` or profile flag.
+  - **Codex Desktop Concurrency:** **BLOCKED** (`InstancePolicy::SingleInstance`). Codex Desktop strictly enforces a single instance via Electron `app.requestSingleInstanceLock()`.
+  - **Codex CLI Concurrency:** **VERIFIED** (`InstancePolicy::MultiInstance`). Independent CLI sessions across distinct `CODEX_HOME` profiles run simultaneously without conflict.
 - **Architectural Boundary:**
-  - AI Switcher explicitly separates **Codex CLI Account Profile** (isolated) from **Codex Desktop Session** (shared/unmanaged).
-  - Primary button for Codex in AI Switcher is `[Open Codex CLI]`.
-  - Secondary dropdown item is `Open Codex Desktop (Shared Session)` with user confirmation.
-  - AI Switcher will **never** implement credential swapping, `auth.json` copying, or binary patching.
+  - AI Switcher preserves Desktop-First as the primary product experience while maintaining total honesty regarding session sharing.
+  - Primary button for Codex in AI Switcher is `[Open Codex Desktop]`.
+  - The UI displays `Shared Windows Desktop session` to ensure users know Desktop uses a shared Windows session.
+  - CLI multi-account isolation is readily accessible via secondary actions (`Open Codex CLI`).
+  - AI Switcher will **never** attempt credential file swapping or binary patching.
 - **Status Detection:**
-  - Probed via `codex.exe login status` with `CODEX_HOME` set.
-  - Exit code `0` ("Logged in using ChatGPT") -> `ready` (`authenticated`); Exit code `1` ("Not logged in") -> `login_required`.
-- **Concurrency Policy:**
-  - `InstancePolicy::SingleInstance` enforced for Desktop; CLI supports concurrent instances across distinct profiles.
+  - Probed per-surface: Desktop session probed via Desktop state metadata; CLI probed via `codex.exe login status` with `CODEX_HOME` set.
+  - Exit code `0` ("Logged in using ChatGPT") -> `authenticated`; Exit code `1` ("Not logged in") -> `login_required`.
+- **Surface-Aware Instance Policy:**
+  - Enforces `InstancePolicy::SingleInstance` for `ExecutionSurface::DesktopApp` and `InstancePolicy::MultiInstance` for `ExecutionSurface::Cli`.
 
 ### 5.2 Anthropic Claude / Claude Code (Desktop-First)
-- **Preferred Launch Surface:** Native Claude Desktop GUI application (`AnthropicClaude\claude.exe`) directly navigating to Claude Code via deep link.
+- **Preferred Launch Surface (PRIMARY):** Native Claude Desktop GUI application (`AnthropicClaude\claude.exe`) directly navigating to Claude Code via deep link. Primary card button is `[Open Claude Desktop]`.
+- **Secondary Surfaces:** Claude CLI (`Open Claude CLI`), Claude Web (`Open Claude Web`).
 - **Deep Link Navigation:**
   - Invokes `claude://code/new?folder=<percent_encoded_folder>`.
   - Workspace paths containing spaces and Unicode/Korean characters are strictly percent-encoded (`target%20folder/%ED%85%8C%EC%8A%A4%ED%8A%B8`).
@@ -160,35 +163,33 @@ stateDiagram-v2
   - The user's default `%APPDATA%\Claude` profile is never modified or touched.
 - **Concurrency & Multi-Instance Support:**
   - **VERIFIED**. Electron's `app.requestSingleInstanceLock()` is scoped per `userData` directory. Different AI Switcher profiles run concurrently as completely independent process trees (`InstancePolicy::MultiInstance`).
-- **Secondary & Fallback Surfaces:**
-  - **Claude Code CLI (External Terminal):** Spawns `wt.exe -d <workspace_path> claude.exe` with `CLAUDE_CONFIG_DIR="<profile_dir>\cli"`.
-  - **Claude Web:** Spawns isolated Chromium browser via `BrowserProfileManager` navigating to `https://claude.ai`.
 - **Status Detection:**
-  - **Desktop Status Probing:** Inspects `<profile_dir>\desktop\Network\Cookies` SQLite DB specifically for `host_key LIKE '%claude.ai%' AND name = 'sessionKey'`. Anonymous Cloudflare cookies (`cf_clearance`, etc.) are ignored.
-  - **CLI Status Probing:** Probed via `claude.exe auth status --json` with `CLAUDE_CONFIG_DIR` only when Desktop is not installed. Missing CLI executable strictly returns `login_required` (never `ready`).
+  - **Desktop Status Probing:** **VERIFIED**. Inspects `<profile_dir>\desktop\Network\Cookies` SQLite DB specifically for `host_key LIKE '%claude.ai%' AND name = 'sessionKey'`. Anonymous Cloudflare cookies (`cf_clearance`, etc.) are excluded. SQLite read locks return `AuthStatus::Unknown` (never false `login_required`).
+  - **CLI Status Probing:** **VERIFIED**. Probed via `claude.exe auth status --json` with `CLAUDE_CONFIG_DIR` only when CLI surface is explicitly checked. Missing CLI executable strictly returns `login_required` (never `authenticated`).
 - **Logout:**
   - Cleans up isolated session cookies, `Session Storage`, and `Local Storage` in `<profile_dir>\desktop` and executes `claude.exe auth logout` for CLI.
 
 ### 5.3 Google Antigravity (Desktop-First)
-- **Preferred Launch Surface:** Native Antigravity desktop GUI application (`Antigravity.exe`).
-- **Isolation Mechanism (VERIFIED):**
-  - Storage locations:
+- **Preferred Launch Surface (PRIMARY):** Native Antigravity desktop GUI application (`Antigravity.exe`). Primary card button is `[Open Antigravity Desktop]`.
+- **Isolation Mechanism:**
+  - **VERIFIED**. Storage locations:
     - Chromium user data: `--user-data-dir="<profile_dir>\data"` isolates Electron LocalStorage, IndexedDB, cookies, and `app_storage.json`.
     - Agent & account state: Injecting `USERPROFILE="<profile_dir>\home"` and `HOME="<profile_dir>\home"` isolates the entire `.gemini` directory tree (`oauth_creds.json`, `antigravity/`, `config/`).
     - AppData cache: Injected `APPDATA="<profile_dir>\appdata"`.
   - Executable target: `%LOCALAPPDATA%\Programs\antigravity\Antigravity.exe`.
   - System isolation: The user's real `%USERPROFILE%\.gemini` and `%APPDATA%\Antigravity` remain 100% untouched.
 - **Protocol Callback Broker:**
-  - Antigravity OAuth deep links (`antigravity://`) are intercepted via headless broker `--broker-protocol antigravity "%1"`.
-  - The broker routes the callback URL directly into the active isolated instance with `--user-data-dir` and isolated `USERPROFILE`, preventing credentials from dropping into the host's global profile.
-- **Concurrency & Multi-Instance Support (VERIFIED):**
-  - Antigravity supports `InstancePolicy::MultiInstance` across distinct `--user-data-dir` profiles.
-- **Workspace Launch Limitation (VERIFIED):**
-  - Antigravity's Electron `main.js` does NOT support direct command-line folder/workspace arguments.
+  - **VERIFIED**. Headless broker `--broker-protocol antigravity "%1"` intercepts OAuth callbacks (`antigravity://auth/...`).
+  - Routes the callback URL directly into the active isolated instance with `--user-data-dir` and isolated `USERPROFILE`, preventing credentials from dropping into the host's global profile.
+  - Transactional registration, ownership checks, URL path validation, single-flow concurrency locks, and immediate restoration ensure zero system side effects.
+- **Concurrency & Multi-Instance Support:**
+  - **VERIFIED**. Antigravity supports `InstancePolicy::MultiInstance` across distinct `--user-data-dir` profiles.
+- **Workspace Launch Limitation:**
+  - **PARTIALLY VERIFIED**. Antigravity's Electron `main.js` does NOT support direct command-line folder/workspace arguments.
   - Workspace navigation is performed inside the GUI. AI Switcher sets process working directory (`cwd`) to the target workspace.
-- **Status Detection (VERIFIED):**
-  - Probes `<profile_dir>\home\.gemini\oauth_creds.json` existence and non-zero size without reading sensitive tokens (`ready` vs `login_required`).
-- **Logout (VERIFIED):**
+- **Status Detection:**
+  - **PARTIALLY VERIFIED**. Probes `<profile_dir>\home\.gemini\oauth_creds.json` existence and non-zero size without reading sensitive tokens (`CredentialStatePresent`). Does not claim validated token expiry or live session freshness.
+- **Logout:**
   - Deletes `<profile_dir>\home\.gemini\oauth_creds.json` and clears session cookies from `<profile_dir>\data\Network\Cookies`.
 - **Managed Directory Safety:**
   - Implements `validate_profile_id` and `validate_antigravity_profile_dir` to strictly prevent traversal (`..`) and prohibit targeting user home, system `.gemini`, or system `AppData\Roaming\Antigravity`.

@@ -1,1 +1,1 @@
-ecb7af479e5fcf9c509bee421993d14a0dcb609cc3ac2838096b564579d0bb73  AI Switcher_0.2.0_x64-setup.exe
+49b0d7b09476c6d70613e9bbebcdfa22cb2e1c44908bf9e4de7533f50f0397b6  AI Switcher_0.2.1_x64-setup.exe

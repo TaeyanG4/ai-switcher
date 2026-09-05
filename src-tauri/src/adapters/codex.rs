@@ -5,7 +5,8 @@ use std::process::Command;
 use crate::adapters::{LaunchSpec, PlatformAdapter};
 use crate::error::{AppError, Result};
 use crate::models::{
-    AccountProfile, AccountStatus, ExecutionSurface, InstancePolicy, LaunchTarget, PlatformType,
+    AccountProfile, AccountStatus, AuthStatus, ExecutionSurface, InstancePolicy, LaunchTarget,
+    PlatformType,
 };
 
 pub struct CodexAdapter;
@@ -82,12 +83,20 @@ impl PlatformAdapter for CodexAdapter {
         InstancePolicy::SingleInstance
     }
 
+    fn instance_policy_for(&self, surface: ExecutionSurface) -> InstancePolicy {
+        match surface {
+            ExecutionSurface::DesktopApp => InstancePolicy::SingleInstance,
+            ExecutionSurface::Cli => InstancePolicy::MultiInstance,
+            ExecutionSurface::Web => InstancePolicy::MultiInstance,
+        }
+    }
+
     fn supported_surfaces(&self) -> Vec<ExecutionSurface> {
         vec![ExecutionSurface::DesktopApp, ExecutionSurface::Cli]
     }
 
     fn default_surface(&self) -> ExecutionSurface {
-        ExecutionSurface::Cli
+        ExecutionSurface::DesktopApp
     }
 
     fn detect_executable(&self) -> Result<PathBuf> {
@@ -198,6 +207,28 @@ model = "o3"
         }
     }
 
+    async fn check_surface_auth_status(
+        &self,
+        profile: &AccountProfile,
+        surface: ExecutionSurface,
+    ) -> Result<AuthStatus> {
+        match surface {
+            ExecutionSurface::Cli => {
+                let status = self.check_status(profile).await?;
+                Ok(match status {
+                    AccountStatus::Ready => AuthStatus::Authenticated,
+                    AccountStatus::LoginRequired => AuthStatus::LoginRequired,
+                    _ => AuthStatus::Unknown,
+                })
+            }
+            ExecutionSurface::DesktopApp => {
+                // Desktop runs in a shared Windows session; profile isolation is unsupported.
+                Ok(AuthStatus::Unknown)
+            }
+            ExecutionSurface::Web => Ok(AuthStatus::Unknown),
+        }
+    }
+
     fn build_launch_spec(
         &self,
         profile: &AccountProfile,
@@ -221,7 +252,7 @@ model = "o3"
         }
 
         match target {
-            LaunchTarget::Desktop => {
+            LaunchTarget::Desktop | LaunchTarget::Default => {
                 let path_arg = workdir.to_string_lossy().to_string();
                 Ok(LaunchSpec {
                     executable: exec,

@@ -224,10 +224,11 @@ export function App() {
     }
   };
 
-  const handleCheckStatus = async (account: AccountProfile) => {
+  const handleCheckStatus = async (account: AccountProfile, surface?: ExecutionSurface) => {
     try {
-      showNotification(`Verifying session for "${account.displayName}"...`, "info");
-      const status = await checkAccountStatus(account.id);
+      const surfaceLabel = surface ? ` (${surface})` : "";
+      showNotification(`Verifying session${surfaceLabel} for "${account.displayName}"...`, "info");
+      const status = await checkAccountStatus(account.id, surface);
       if (status === "ready") {
         showNotification(`"${account.displayName}" is authenticated and ready!`, "success");
       } else if (status === "login_required") {
@@ -276,7 +277,7 @@ export function App() {
 
     try {
       // Step 1: Check same-platform conflict
-      const conflict = await checkLaunchConflict(account.id);
+      const conflict = await checkLaunchConflict(account.id, surface);
       if (conflict) {
         setConflictState({
           conflict,

@@ -39,6 +39,7 @@ fn create_test_profile(profile_path: &Path, display_name: &str) -> AccountProfil
         status: AccountStatus::Ready,
         auth_status: AuthStatus::Authenticated,
         runtime_status: RuntimeStatus::Stopped,
+        auth_states: vec![],
         profile_path: profile_path.to_string_lossy().to_string(),
         browser_profile_path: None,
         browser_profile_id: None,
@@ -63,7 +64,15 @@ fn test_codex_adapter_metadata() {
         adapter.supported_surfaces(),
         vec![ExecutionSurface::DesktopApp, ExecutionSurface::Cli]
     );
-    assert_eq!(adapter.default_surface(), ExecutionSurface::Cli);
+    assert_eq!(adapter.default_surface(), ExecutionSurface::DesktopApp);
+    assert_eq!(
+        adapter.instance_policy_for(ExecutionSurface::DesktopApp),
+        InstancePolicy::SingleInstance
+    );
+    assert_eq!(
+        adapter.instance_policy_for(ExecutionSurface::Cli),
+        InstancePolicy::MultiInstance
+    );
 }
 
 #[test]
@@ -130,6 +139,21 @@ fn test_codex_launch_spec_desktop_with_workspace() {
         .find(|(k, _)| k == "CODEX_HOME")
         .map(|(_, v)| v.as_str());
     assert_eq!(codex_home, Some(dir.path().to_str().unwrap()));
+}
+
+#[test]
+fn test_codex_launch_spec_default_targets_desktop() {
+    let adapter = CodexAdapter::new();
+    let dir = TestDir::new();
+    let profile = create_test_profile(dir.path(), "Default Profile");
+
+    let spec = adapter
+        .build_launch_spec(&profile, LaunchTarget::Default, None)
+        .expect("Failed to build default launch spec");
+
+    assert_eq!(spec.arguments[0], "app");
+    assert_eq!(spec.arguments[1], dir.path().to_str().unwrap());
+    assert!(!spec.is_terminal);
 }
 
 #[test]
